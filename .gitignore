@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Python package build artifacts
+*.egg-info/
+build/
+dist/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
