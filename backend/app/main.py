@@ -7,6 +7,8 @@ from app.models.researcher import Researcher
 from app.api.researchers import router as researchers_router
 from app.models.resource import Resource
 from app.api.resources import router as resources_router
+from app.models.publication import Publication
+from app.api.publications import router as publications_router
 
 
 @asynccontextmanager
@@ -23,6 +25,7 @@ app = FastAPI(
 
 app.include_router(researchers_router)
 app.include_router(resources_router)
+app.include_router(publications_router)
 
 
 @app.get("/")
