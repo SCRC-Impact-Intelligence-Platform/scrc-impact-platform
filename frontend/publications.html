@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Publications</title>
+</head>
+<body>
+  <main>
+    <p><a href="/ui/">Home</a></p>
+    <h1>Publications</h1>
+    <p>
+      <button id="discover" type="button">Search all researchers</button>
+    </p>
+    <p id="message" role="status" aria-live="polite"></p>
+    <h2>Results</h2>
+    <ul id="researchers" aria-live="polite"></ul>
+  </main>
+
+  <script>
+    const message = document.querySelector("#message");
+    const researcherList = document.querySelector("#researchers");
+    const discoverButton = document.querySelector("#discover");
+
+    function addText(parent, tag, text) {
+      const element = document.createElement(tag);
+      element.textContent = text;
+      parent.append(element);
+    }
+
+    function createPublicationList(publications) {
+      const list = document.createElement("ul");
+      if (publications.length === 0) {
+        list.append(document.createTextNode("No publications found for this researcher."));
+        return list;
+      }
+
+      for (const publication of publications) {
+        const item = document.createElement("li");
+        addText(item, "h3", publication.title || "Untitled publication");
+        addText(item, "p", (publication.authors || []).join(", "));
+        addText(item, "p", [publication.journal, publication.publication_date].filter(Boolean).join("; "));
+        addText(item, "p", `PMID ${publication.pmid} | Status: ${publication.status}`);
+
+        if (publication.abstract) {
+          const details = document.createElement("details");
+          addText(details, "summary", "Abstract");
+          addText(details, "p", publication.abstract);
+          item.append(details);
+        }
+
+        list.append(item);
+      }
+
+      return list;
+    }
+
+    async function loadPublications() {
+      researcherList.replaceChildren(document.createTextNode("Loading researchers and publications..."));
+      const publications = [];
+      let offset = 0;
+
+      while (true) {
+        const response = await fetch(`/publications?limit=200&offset=${offset}`);
+        if (!response.ok) throw new Error(`Could not load publications (${response.status})`);
+        const page = await response.json();
+        publications.push(...page);
+        if (page.length < 200) break;
+        offset += page.length;
+      }
+
+      const researcherResponse = await fetch("/researchers");
+      if (!researcherResponse.ok) {
+        throw new Error(`Could not load researchers (${researcherResponse.status})`);
+      }
+      const researchers = await researcherResponse.json();
+      const researcherGroups = new Map(researchers.map((researcher) => [researcher.orcid, []]));
+
+      for (const publication of publications) {
+        const orcid = publication.first_discovered_by_orcid;
+        researcherGroups.get(orcid)?.push(publication);
+      }
+
+      researcherList.replaceChildren();
+      const researchersWithMatches = researchers.filter(
+        (researcher) => researcherGroups.get(researcher.orcid)?.length > 0
+      );
+      if (researchersWithMatches.length === 0) {
+        researcherList.append(document.createTextNode("No researcher matches found."));
+        return;
+      }
+
+      researchersWithMatches.sort((left, right) => left.name.localeCompare(right.name));
+      for (const researcher of researchersWithMatches) {
+        const item = document.createElement("li");
+        const publicationsForResearcher = researcherGroups.get(researcher.orcid);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = `${researcher.name} (${publicationsForResearcher.length})`;
+        button.setAttribute("aria-expanded", "false");
+
+        const results = document.createElement("div");
+        results.hidden = true;
+        button.addEventListener("click", () => {
+          results.hidden = !results.hidden;
+          button.setAttribute("aria-expanded", String(!results.hidden));
+        });
+        results.append(createPublicationList(publicationsForResearcher));
+        item.append(button, results);
+        researcherList.append(item);
+      }
+    }
+
+    discoverButton.addEventListener("click", async () => {
+      discoverButton.disabled = true;
+      message.textContent = "Searching PubMed for all researchers...";
+
+      try {
+        const response = await fetch("/publications/discover", { method: "POST" });
+        const summary = await response.json();
+        if (!response.ok) throw new Error(summary.detail || `Search failed (${response.status})`);
+
+        const failureCount = summary.failures.length;
+        message.textContent =
+          `Searched ${summary.researchers_searched} researcher(s). ` +
+          `Found ${summary.publications_found} match(es), including ${summary.new_publications} new publication(s).` +
+          (failureCount ? ` ${failureCount} researcher search(es) failed.` : "");
+        await loadPublications();
+      } catch (error) {
+        message.textContent = `Could not complete search: ${error.message}`;
+        try {
+          await loadPublications();
+        } catch (loadError) {
+          researcherList.replaceChildren(document.createTextNode(loadError.message));
+        }
+      } finally {
+        discoverButton.disabled = false;
+      }
+    });
+
+    loadPublications().catch((error) => {
+      researcherList.replaceChildren(document.createTextNode(error.message));
+    });
+  </script>
+</body>
+</html>

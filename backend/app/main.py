@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
 from app.models.researcher import Researcher
@@ -26,6 +28,14 @@ app = FastAPI(
 app.include_router(researchers_router)
 app.include_router(resources_router)
 app.include_router(publications_router)
+app.mount(
+    "/ui",
+    StaticFiles(
+        directory=Path(__file__).resolve().parents[2] / "frontend",
+        html=True,
+    ),
+    name="ui",
+)
 
 
 @app.get("/")
