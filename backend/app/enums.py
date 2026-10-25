@@ -15,3 +15,9 @@ class PublicationStatus(StrEnum):
     CONFIRMED = "CONFIRMED"
     REJECTED = "REJECTED"
     DISMISSED = "DISMISSED"
+
+
+class ResourceType(StrEnum):
+    EQUIPMENT = "EQUIPMENT"
+    FUNDING = "FUNDING"
+    SERVICE = "SERVICE"
