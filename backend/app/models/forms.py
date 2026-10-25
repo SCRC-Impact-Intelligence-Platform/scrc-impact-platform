@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import ForeignKey, JSON, String, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
+from app.enums import FormBatchState
 
 
 def utcnow():
@@ -14,7 +15,7 @@ class FormBatch(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     google_form_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     responder_url: Mapped[str | None] = mapped_column(String(2048))
-    state: Mapped[str] = mapped_column(String(20), default="CREATING")
+    state: Mapped[str] = mapped_column(String(20), default=FormBatchState.CREATING.value)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

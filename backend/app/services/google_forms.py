@@ -27,7 +27,7 @@ def get_forms_service():
 def create_google_form(items: list[dict]) -> tuple[str, str, list[tuple[str, str]]]:
     """Returns Google form ID, responder URL, and question-ID pairs per publication."""
     service = get_forms_service()
-    created = service.forms().create(body={"info": {"title": "SCRC Publication Attribution Verification (PoC)"}}).execute()
+    created = service.forms().create(body={"info": {"title": "SCRC Publication Attribution Verification"}}).execute()
     form_id = created["formId"]
     requests = []
     for item in items:

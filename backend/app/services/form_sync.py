@@ -2,7 +2,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.forms_poc import FormQuestion, SyncedFormResponse
+from app.models.forms import FormQuestion, SyncedFormResponse
+from app.enums import FormBatchState
 from app.models.publication import Publication
 from app.models.publication_resource import publication_resources
 
@@ -12,8 +13,20 @@ def _values(answers: dict, question_id: str) -> list[str]:
 
 
 def sync_batch(db: Session, batch, responses: list[dict]) -> dict:
+    # A completed batch is immutable; it is never processed again.
+    if batch.state == FormBatchState.COMPLETED:
+        return {"processed": 0, "skipped": len(responses), "invalid": 0}
     questions = db.scalars(select(FormQuestion).where(FormQuestion.batch_id == batch.id)).all()
     result = {"processed": 0, "skipped": 0, "invalid": 0}
+    # Exactly one valid submission per batch. If multiple distinct submissions
+    # are present before syncing, stop and require administrator reconciliation.
+    already = db.scalar(select(SyncedFormResponse).where(SyncedFormResponse.batch_id == batch.id))
+    if already:
+        batch.state = FormBatchState.COMPLETED.value
+        db.commit()
+        return {"processed": 0, "skipped": len(responses), "invalid": 0}
+    if len(responses) > 1:
+        raise ValueError("Multiple submissions for one batch; manual review required")
     for response in responses:
         response_id = response["responseId"]
         if db.scalar(select(SyncedFormResponse.id).where(SyncedFormResponse.batch_id == batch.id, SyncedFormResponse.google_response_id == response_id)):
@@ -57,6 +70,7 @@ def sync_batch(db: Session, batch, responses: list[dict]) -> dict:
             for resource_id in resource_ids:
                 db.execute(publication_resources.insert().values(publication_id=publication.id, resource_id=resource_id))
         db.add(SyncedFormResponse(batch_id=batch.id, google_response_id=response_id))
+        batch.state = FormBatchState.COMPLETED.value
         db.commit()
         result["processed"] += 1
     return result
