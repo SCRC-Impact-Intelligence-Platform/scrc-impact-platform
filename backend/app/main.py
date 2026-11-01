@@ -1,8 +1,7 @@
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from sqlalchemy import text
 
-from fastapi import FastAPI
-
-from app.database import Base, engine
+from app.database import engine
 from app.models.researcher import Researcher
 from app.api.researchers import router as researchers_router
 from app.models.resource import Resource
@@ -15,16 +14,9 @@ from app.models.forms import FormBatch, FormQuestion, SyncedFormResponse
 from app.models.publication_resource import publication_resources
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
 app = FastAPI(
     title="SCRC Impact Intelligence Platform",
     version="0.1.0",
-    lifespan=lifespan,
 )
 
 app.include_router(researchers_router)
@@ -36,4 +28,15 @@ app.include_router(attributions_router)
 
 @app.get("/")
 def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/health/db")
+def database_health_check():
+    """Readiness check: confirms the database is reachable."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="database unavailable")
     return {"status": "ok"}

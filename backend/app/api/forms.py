@@ -47,7 +47,7 @@ def create_form(payload: FormCreate, db: Session = Depends(get_db)):
             raise HTTPException(422, f"Publication {selected.publication_id} must be PENDING")
         if len(set(selected.resource_ids)) != len(selected.resource_ids):
             raise HTTPException(422, "Duplicate resource IDs")
-        resources = db.scalars(select(Resource).where(Resource.id.in_(selected.resource_ids), Resource.is_active.is_(True))).all()
+        resources = db.scalars(select(Resource).where(Resource.id.in_(selected.resource_ids), Resource.is_active)).all()
         if len(resources) != len(selected.resource_ids):
             raise HTTPException(422, "Missing or inactive resource")
         items.append({"publication_id": publication.id, "pmid": publication.pmid, "title": publication.title, "resources": [{"id": r.id, "name": r.name} for r in resources]})

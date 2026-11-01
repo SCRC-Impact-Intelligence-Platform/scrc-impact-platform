@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, JSON, String, Text
+from sqlalchemy import DateTime, JSON, String, Unicode
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -19,7 +19,7 @@ class Publication(Base):
     )
 
     title: Mapped[str] = mapped_column(
-        Text,
+        Unicode,  # NVARCHAR(max) on SQL Server
         nullable=False,
     )
 
@@ -29,7 +29,7 @@ class Publication(Base):
     )
 
     journal: Mapped[str | None] = mapped_column(
-        String(500),
+        Unicode(500),
         nullable=True,
     )
 
@@ -44,7 +44,7 @@ class Publication(Base):
     )
 
     abstract: Mapped[str | None] = mapped_column(
-        Text,
+        Unicode,  # NVARCHAR(max) on SQL Server
         nullable=True,
     )
 
