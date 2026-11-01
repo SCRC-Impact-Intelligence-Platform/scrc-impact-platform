@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, String, Unicode
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -12,7 +12,7 @@ class Researcher(Base):
     )
 
     name: Mapped[str] = mapped_column(
-        String(255),
+        Unicode(255),
         nullable=False,
     )
 

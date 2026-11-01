@@ -14,7 +14,7 @@ def main():
     with SessionLocal() as db:
         researchers = db.scalars(
             select(Researcher)
-            .where(Researcher.is_active.is_(True))
+            .where(Researcher.is_active)
             .order_by(Researcher.id)
         ).all()
 

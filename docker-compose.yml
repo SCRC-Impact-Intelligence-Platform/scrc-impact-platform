@@ -1,0 +1,33 @@
+# Local dev stack: SQL Server + backend.  Run: docker compose up --build
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: LocalDev_Passw0rd!
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    # Also creates the app database once the server is up.
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -C -U sa -P "$$MSSQL_SA_PASSWORD" -b -Q "IF DB_ID('scrc_impact') IS NULL CREATE DATABASE scrc_impact"
+      interval: 5s
+      retries: 30
+      start_period: 20s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      # TrustServerCertificate: the local server uses a self-signed cert.
+      DATABASE_URL: mssql+pyodbc://sa:LocalDev_Passw0rd!@mssql:1433/scrc_impact?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+    ports:
+      - "8000:8000"
+
+volumes:
+  mssql-data:
