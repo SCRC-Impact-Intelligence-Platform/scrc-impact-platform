@@ -28,3 +28,11 @@ For Docker Compose, set `BACKEND_UPSTREAM=http://backend:8000` where `backend` i
 `nginx/default.conf.template` uses the standard Nginx container envsubst template mechanism, and both proxy layers strip the `/api` prefix.
 
 No automatic deployment, auth, real data, emails, or workflows are included. Configure HTTPS, authorization, network policy and correct upstream settings before production.
+
+## Researchers and Resources CRUD (local development)
+
+The `/researchers` and `/resources` pages now call the actual FastAPI endpoints through the `/api` Vite/Nginx proxy. These pages support list, create, edit, and delete; they refresh TanStack Query caches after mutations.
+
+Start FastAPI from `backend/` with `python -m uvicorn app.main:app --reload`, and Vite from `frontend/` with `npm run dev`. Open `http://127.0.0.1:5173/researchers` or `/resources`. No CORS setting is needed for these same-origin proxy calls.
+
+**Security:** FastAPI CRUD endpoints do not yet require an admin login. Do not expose this instance publicly. For existing records, the UI only permits ORCID changes via deletion/recreation because the backend `ResearcherUpdate` schema does not permit editing ORCID. Prefer deactivation over deletion when records are referenced by publications or attributions.
