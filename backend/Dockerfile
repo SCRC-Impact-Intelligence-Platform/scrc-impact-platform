@@ -11,7 +11,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend /srv/backend
-COPY frontend /srv/frontend
 WORKDIR /srv/backend
 RUN pip install --no-cache-dir .
 

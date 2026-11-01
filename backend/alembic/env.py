@@ -5,7 +5,9 @@ from alembic import context
 from app.database import Base, DATABASE_URL, engine
 
 # Import every model so its table is registered on Base.metadata.
+import app.models.forms  # noqa: F401
 import app.models.publication  # noqa: F401
+import app.models.publication_resource  # noqa: F401
 import app.models.researcher  # noqa: F401
 import app.models.resource  # noqa: F401
 

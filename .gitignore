@@ -29,3 +29,5 @@ dist/
 # Editors
 .vscode/
 .idea/
+# Google OAuth credentials (never commit)
+.secrets/

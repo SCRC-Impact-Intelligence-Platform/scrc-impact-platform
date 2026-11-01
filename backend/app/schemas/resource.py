@@ -1,13 +1,6 @@
-from typing import Literal
+from app.enums import ResourceType
 
 from pydantic import BaseModel, ConfigDict, Field
-
-
-ResourceType = Literal[
-    "EQUIPMENT",
-    "FUNDING",
-    "SERVICE",
-]
 
 
 class ResourceCreate(BaseModel):

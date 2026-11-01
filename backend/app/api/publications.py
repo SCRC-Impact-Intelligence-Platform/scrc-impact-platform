@@ -5,13 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.publication import Publication
-from app.models.researcher import Researcher
 from app.schemas.publication import (
     PublicationResponse,
     PublicationStatus,
 )
-from app.services.pubmed import discover_publications
-from app.services.publications import save_publications
 
 
 router = APIRouter(
@@ -39,49 +36,6 @@ def list_publications(
     )
 
     return db.scalars(stmt).all()
-
-
-@router.post("/discover")
-def discover_for_researchers(db: Session = Depends(get_db)):
-    researchers = db.scalars(
-        select(Researcher)
-        .order_by(Researcher.id)
-    ).all()
-
-    results = []
-    total_found = 0
-    total_new = 0
-    failures = []
-
-    for researcher in researchers:
-        try:
-            publications = discover_publications(researcher.orcid)
-            new_count = save_publications(
-                db=db,
-                source_orcid=researcher.orcid,
-                publications=publications,
-            )
-            total_found += len(publications)
-            total_new += new_count
-            results.append({
-                "researcher": researcher.name,
-                "found": len(publications),
-                "new": new_count,
-            })
-        except Exception as exc:
-            db.rollback()
-            failures.append({
-                "researcher": researcher.name,
-                "error": str(exc),
-            })
-
-    return {
-        "researchers_searched": len(researchers),
-        "publications_found": total_found,
-        "new_publications": total_new,
-        "results": results,
-        "failures": failures,
-    }
 
 
 @router.get(

@@ -13,6 +13,8 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "pyodbc>=5.1,<6",
     "alembic>=1.13,<2",
+    "google-api-python-client>=2,<3",
+    "google-auth-oauthlib>=1,<2",
 ]
 
 [tool.setuptools.packages.find]

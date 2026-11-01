@@ -6,7 +6,7 @@ variable (required; see `backend/.env.example`).
 ### Local stack (SQL Server + backend in Docker)
 
 ```bash
-docker compose up --build        # UI: http://localhost:8000/ui
+docker compose up --build        # UI: http://localhost:8080
 docker compose exec backend python -m app.cli   # run publication discovery
 docker compose down -v           # stop and wipe the local database
 ```

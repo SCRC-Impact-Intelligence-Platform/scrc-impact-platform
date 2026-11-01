@@ -1,16 +1,9 @@
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 
-PublicationStatus = Literal[
-    "PENDING",
-    "SENT",
-    "CONFIRMED",
-    "REJECTED",
-    "DISMISSED",
-]
+from app.enums import PublicationStatus
 
 
 class PublicationResponse(BaseModel):

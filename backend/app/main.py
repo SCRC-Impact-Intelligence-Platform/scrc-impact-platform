@@ -1,8 +1,5 @@
-from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
-from fastapi.staticfiles import StaticFiles
 
 from app.database import engine
 from app.models.researcher import Researcher
@@ -11,6 +8,10 @@ from app.models.resource import Resource
 from app.api.resources import router as resources_router
 from app.models.publication import Publication
 from app.api.publications import router as publications_router
+from app.api.forms import router as forms_router
+from app.api.attributions import router as attributions_router
+from app.models.forms import FormBatch, FormQuestion, SyncedFormResponse
+from app.models.publication_resource import publication_resources
 
 
 app = FastAPI(
@@ -21,14 +22,8 @@ app = FastAPI(
 app.include_router(researchers_router)
 app.include_router(resources_router)
 app.include_router(publications_router)
-app.mount(
-    "/ui",
-    StaticFiles(
-        directory=Path(__file__).resolve().parents[2] / "frontend",
-        html=True,
-    ),
-    name="ui",
-)
+app.include_router(forms_router)
+app.include_router(attributions_router)
 
 
 @app.get("/")
