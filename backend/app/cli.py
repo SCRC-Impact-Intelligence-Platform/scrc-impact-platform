@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from app.database import Base, engine, SessionLocal
+from app.database import SessionLocal
 from app.models.researcher import Researcher
 from app.models.publication import Publication
 
@@ -9,8 +9,6 @@ from app.services.publications import save_publications
 
 
 def main():
-    Base.metadata.create_all(bind=engine)
-
     with SessionLocal() as db:
         researchers = db.scalars(
             select(Researcher)

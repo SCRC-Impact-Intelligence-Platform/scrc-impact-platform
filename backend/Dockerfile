@@ -15,4 +15,5 @@ COPY frontend /srv/frontend
 WORKDIR /srv/backend
 RUN pip install --no-cache-dir .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Apply any pending migrations, then start the app.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

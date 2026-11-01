@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn>=0.30,<1",
     "sqlalchemy>=2.0,<3",
     "pyodbc>=5.1,<6",
+    "alembic>=1.13,<2",
 ]
 
 [tool.setuptools.packages.find]

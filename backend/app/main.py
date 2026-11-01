@@ -1,11 +1,10 @@
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, engine
+from app.database import engine
 from app.models.researcher import Researcher
 from app.api.researchers import router as researchers_router
 from app.models.resource import Resource
@@ -14,16 +13,9 @@ from app.models.publication import Publication
 from app.api.publications import router as publications_router
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
 app = FastAPI(
     title="SCRC Impact Intelligence Platform",
     version="0.1.0",
-    lifespan=lifespan,
 )
 
 app.include_router(researchers_router)
