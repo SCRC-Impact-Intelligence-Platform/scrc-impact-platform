@@ -48,3 +48,61 @@ python -m unittest discover -s tests -v
 
 Start the API (`python -m uvicorn app.main:app --reload`) and inspect
 `GET /publications` at <http://127.0.0.1:8000/docs>.
+
+## Google Forms OAuth Setup (Local Development)
+
+The backend uses Google OAuth 2.0 to create Google Forms and retrieve responses.
+
+### Prerequisites
+
+1. Enable the Google Forms API in the shared Google Cloud project.
+2. Ask a project maintainer to add your Google account under:
+   Google Auth Platform → Audience → Test users.
+3. Obtain the Desktop OAuth client configuration from a project
+   maintainer through an approved secure channel.
+
+### Setup
+
+From the `backend/` directory:
+
+```bash
+mkdir -p .secrets
+```
+
+Save the OAuth client configuration as:
+
+```text
+backend/.secrets/google_oauth_client.json
+```
+
+Activate the Python virtual environment and install dependencies:
+
+```bash
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+Complete OAuth authorization:
+
+```bash
+python -m app.google_auth
+```
+
+Sign in with your Google account and approve the requested Google Forms permissions.
+
+After successful authorization, the backend stores your credentials at:
+
+```text
+backend/.secrets/google_token.json
+```
+
+### Important Notes
+
+- Never commit or share `google_token.json`.
+- Do not commit `google_oauth_client.json`.
+- Each developer should authorize their own Google account.
+- Forms created by one account are not automatically accessible to other accounts.
+- The OAuth app is currently in External / Testing mode.
+- Google refresh tokens issued in this mode generally expire after 7 days for the Forms scopes.
+- Run `python -m app.google_auth` again if reauthorization is required.
+- Production authentication and credential management will be configured separately.
