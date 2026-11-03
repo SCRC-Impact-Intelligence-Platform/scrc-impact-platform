@@ -47,6 +47,21 @@ def author_name_query(name: str) -> str:
     return f"{surname} {initials}[au]"
 
 
+# Affiliation restriction for researchers without ORCID. PubMed [ad] searches
+# affiliations across the citation, not necessarily the matched author's own.
+UCI_AFFILIATION_QUERY = (
+    '("University of California Irvine"[ad] '
+    'OR "University of California, Irvine"[ad] '
+    'OR "UC Irvine"[ad] '
+    'OR "UCIRVINE"[ad])'
+)
+
+
+def author_affiliation_query(name: str) -> str:
+    """Narrow name-only discovery to publications mentioning UCI affiliation."""
+    return f"({author_name_query(name)}) AND {UCI_AFFILIATION_QUERY}"
+
+
 def _search_publication_ids(term: str, *, start_date: date | None = None, end_date: date | None = None) -> list[str]:
     end_date = end_date or date.today()
     start_date = start_date or months_ago(end_date)
@@ -76,7 +91,7 @@ def search_publications_by_orcid(orcid: str, *, start_date: date | None = None, 
 
 
 def search_publications_by_name(name: str, *, start_date: date | None = None, end_date: date | None = None) -> list[str]:
-    return _search_publication_ids(author_name_query(name), start_date=start_date, end_date=end_date)
+    return _search_publication_ids(author_affiliation_query(name), start_date=start_date, end_date=end_date)
 
 
 def _text(node):
