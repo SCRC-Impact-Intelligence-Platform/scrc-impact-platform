@@ -1,10 +1,10 @@
 import { apiRequest } from '../../app/api'
 
-export type Researcher = { id: number; name: string; orcid: string; is_active: boolean }
+export type Researcher = { id: number; name: string; orcid: string; email: string; is_active: boolean }
 export type ResourceType = 'EQUIPMENT' | 'FUNDING' | 'SERVICE'
 export type Resource = { id: number; name: string; type: ResourceType; is_active: boolean }
-export type ResearcherCreate = { name: string; orcid: string }
-export type ResearcherUpdate = { name?: string; is_active?: boolean }
+export type ResearcherCreate = { name: string; orcid: string; email: string }
+export type ResearcherUpdate = { name?: string; email?: string; is_active?: boolean }
 export type ResourceCreate = { name: string; type: ResourceType }
 export type ResourceUpdate = { name?: string; type?: ResourceType; is_active?: boolean }
 

@@ -16,6 +16,11 @@ class Researcher(Base):
         nullable=False,
     )
 
+    email: Mapped[str] = mapped_column(
+        String(320),
+        nullable=False,
+    )
+
     orcid: Mapped[str] = mapped_column(
         String(19),
         unique=True,
