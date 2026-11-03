@@ -29,11 +29,12 @@ export default function ResearchersPage() {
         ? researchersApi.update(editing.id, {
             name: value.name.trim(),
             email: value.email.trim(),
+            orcid: value.orcid.trim() || null,
             is_active: value.is_active,
           })
         : researchersApi.create({
             name: value.name.trim(),
-            orcid: value.orcid.trim(),
+            orcid: value.orcid.trim() || null,
             email: value.email.trim(),
           }),
     onSuccess: async () => {
@@ -58,7 +59,12 @@ export default function ResearchersPage() {
   }
   const startEdit = (item: Researcher) => {
     setEditing(item)
-    setDraft({ name: item.name, orcid: item.orcid, email: item.email, is_active: item.is_active })
+    setDraft({
+      name: item.name,
+      orcid: item.orcid ?? '',
+      email: item.email,
+      is_active: item.is_active,
+    })
     setError(null)
   }
   const submit = (event: FormEvent) => {
@@ -108,7 +114,9 @@ export default function ResearchersPage() {
                 {query.data.map((item) => (
                   <tr key={item.id}>
                     <td className="px-5 py-4 font-medium text-slate-900">{item.name}</td>
-                    <td className="px-5 py-4 font-mono text-xs text-slate-600">{item.orcid}</td>
+                    <td className="px-5 py-4 font-mono text-xs text-slate-600">
+                      {item.orcid ?? 'Not provided'}
+                    </td>
                     <td className="px-5 py-4 text-slate-600">{item.email}</td>
                     <td className="px-5 py-4">
                       <StatusBadge active={item.is_active} />
@@ -162,16 +170,15 @@ export default function ResearchersPage() {
             <label className="block space-y-1 text-sm font-medium">
               ORCID
               <input
-                required={!editing}
-                readOnly={!!editing}
                 placeholder="0000-0000-0000-0000"
                 pattern="[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9X]{4}"
-                className={`${inputClass} ${editing ? 'bg-slate-100' : ''}`}
+                className={inputClass}
                 value={draft.orcid}
                 onChange={(e) => setDraft({ ...draft, orcid: e.target.value })}
               />
               <span className="block text-xs font-normal text-slate-500">
-                ORCID cannot be changed through the existing backend update API.
+                Optional. Without an ORCID, discovery searches PubMed by author name (lower
+                confidence).
               </span>
             </label>
             <label className="block space-y-1 text-sm font-medium">

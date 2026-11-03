@@ -6,7 +6,7 @@ from app.models.publication import Publication
 
 def save_publications(
     db: Session,
-    source_orcid: str,
+    source_orcid: str | None,
     publications: list[dict],
 ) -> int:
     new_count = 0

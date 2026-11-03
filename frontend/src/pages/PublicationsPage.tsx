@@ -6,6 +6,7 @@ import { Feedback, secondaryButton } from '../features/directory/DirectoryUI'
 import {
   publicationsApi,
   type Publication,
+  type PublicationConfidence,
   type PublicationStatus,
 } from '../features/publications/api'
 
@@ -25,6 +26,24 @@ function StatusPill({ status }: { status: PublicationStatus }) {
       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${colors[status]}`}
     >
       {status}
+    </span>
+  )
+}
+
+function ConfidencePill({ orcid }: { orcid: string | null }) {
+  const byOrcid = Boolean(orcid)
+  return (
+    <span
+      title={
+        byOrcid
+          ? 'Initially discovered via ORCID search'
+          : 'Initially discovered via author-name search; verify the author match'
+      }
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+        byOrcid ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
+      }`}
+    >
+      {byOrcid ? 'High confidence' : 'Low confidence'}
     </span>
   )
 }
@@ -51,7 +70,10 @@ function PublicationDetails({
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-6">
           <div className="space-y-2">
-            <StatusPill status={publication.status} />
+            <div className="flex flex-wrap gap-2">
+              <StatusPill status={publication.status} />
+              <ConfidencePill orcid={publication.first_discovered_by_orcid} />
+            </div>
             <h2
               id="publication-dialog-title"
               className="text-xl font-bold leading-snug text-slate-900"
@@ -109,8 +131,10 @@ function PublicationDetails({
               </dd>
             </div>
             <div>
-              <dt className="font-semibold text-slate-900">Discovered via ORCID</dt>
-              <dd className="mt-1 font-mono text-xs">{publication.first_discovered_by_orcid}</dd>
+              <dt className="font-semibold text-slate-900">Initial discovery method</dt>
+              <dd className="mt-1 font-mono text-xs">
+                {publication.first_discovered_by_orcid ?? 'Author name search (requires review)'}
+              </dd>
             </div>
             <div>
               <dt className="font-semibold text-slate-900">Discovered at</dt>
@@ -137,10 +161,16 @@ function PublicationDetails({
 
 export default function PublicationsPage() {
   const [status, setStatus] = useState<PublicationStatus | ''>('PENDING')
+  const [confidence, setConfidence] = useState<PublicationConfidence | ''>('')
   const [page, setPage] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const filters = { status: status || undefined, limit: PAGE_SIZE, offset: page * PAGE_SIZE }
+  const filters = {
+    status: status || undefined,
+    confidence: confidence || undefined,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  }
   const query = useQuery({
     queryKey: ['publications', filters],
     queryFn: () => publicationsApi.list(filters),
@@ -197,6 +227,22 @@ export default function PublicationsPage() {
               ))}
             </select>
           </label>
+          <label className="space-y-1 text-sm font-medium text-slate-700">
+            <span className="block">Discovery confidence</span>
+            <select
+              aria-label="Filter by discovery confidence"
+              className="min-w-44 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              value={confidence}
+              onChange={(e) => {
+                setConfidence(e.target.value as PublicationConfidence | '')
+                setPage(0)
+              }}
+            >
+              <option value="">All confidence</option>
+              <option value="HIGH">High confidence</option>
+              <option value="LOW">Low confidence</option>
+            </select>
+          </label>
           <label className="min-w-64 flex-1 space-y-1 text-sm font-medium text-slate-700">
             <span className="block">Search this page</span>
             <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3">
@@ -241,6 +287,7 @@ export default function PublicationsPage() {
                   <tr>
                     <th className="px-5 py-4">Publication</th>
                     <th className="px-5 py-4">Journal / Date</th>
+                    <th className="px-5 py-4">Confidence</th>
                     <th className="px-5 py-4">Status</th>
                     <th className="px-5 py-4 text-right">Details</th>
                   </tr>
@@ -261,6 +308,9 @@ export default function PublicationsPage() {
                       <td className="px-5 py-4 text-slate-600">
                         <p>{p.journal || 'Unknown journal'}</p>
                         <p className="mt-1 text-xs">{p.publication_date || 'No date'}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <ConfidencePill orcid={p.first_discovered_by_orcid} />
                       </td>
                       <td className="px-5 py-4">
                         <StatusPill status={p.status} />

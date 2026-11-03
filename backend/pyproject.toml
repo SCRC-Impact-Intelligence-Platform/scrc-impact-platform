@@ -19,3 +19,8 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+[project.optional-dependencies]
+dev = [
+    "httpx2",
+]

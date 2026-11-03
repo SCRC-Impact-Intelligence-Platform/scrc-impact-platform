@@ -1,4 +1,4 @@
-"""PubMed ORCID discovery: rolling three-month PDAT window and EFetch XML."""
+"""PubMed author discovery: ORCID preferred, name fallback, EFetch metadata."""
 from calendar import monthrange
 from datetime import date
 import json
@@ -35,12 +35,24 @@ def months_ago(today: date, months: int = 3) -> date:
     return date(year, month, min(today.day, monthrange(year, month)[1]))
 
 
-def search_publications_by_orcid(orcid: str, *, start_date: date | None = None, end_date: date | None = None) -> list[str]:
+def author_name_query(name: str) -> str:
+    """Basic LastName + initials PubMed [au] query; review ambiguous matches."""
+    parts = name.replace(",", " ").split()
+    if len(parts) < 2:
+        raise ValueError("Full researcher name (given name and surname) is required for name search")
+    surname = parts[-1]
+    initials = "".join(part[0] for part in parts[:-1] if part[0].isalpha())[:2]
+    if not initials or not surname[0].isalpha():
+        raise ValueError("Invalid researcher name for PubMed author search")
+    return f"{surname} {initials}[au]"
+
+
+def _search_publication_ids(term: str, *, start_date: date | None = None, end_date: date | None = None) -> list[str]:
     end_date = end_date or date.today()
     start_date = start_date or months_ago(end_date)
     if start_date > end_date:
         raise ValueError("start_date must be <= end_date")
-    base = {"db": "pubmed", "term": f"orcid {orcid}[auid]", "sort": "pub_date",
+    base = {"db": "pubmed", "term": term, "sort": "pub_date",
             "datetype": "pdat", "mindate": start_date.strftime("%Y/%m/%d"),
             "maxdate": end_date.strftime("%Y/%m/%d"), "retmax": PAGE_SIZE}
     ids = []
@@ -57,6 +69,14 @@ def search_publications_by_orcid(orcid: str, *, start_date: date | None = None, 
         offset += len(page)
         if offset >= count:
             return list(dict.fromkeys(ids))
+
+
+def search_publications_by_orcid(orcid: str, *, start_date: date | None = None, end_date: date | None = None) -> list[str]:
+    return _search_publication_ids(f"orcid {orcid}[auid]", start_date=start_date, end_date=end_date)
+
+
+def search_publications_by_name(name: str, *, start_date: date | None = None, end_date: date | None = None) -> list[str]:
+    return _search_publication_ids(author_name_query(name), start_date=start_date, end_date=end_date)
 
 
 def _text(node):
@@ -122,5 +142,11 @@ def fetch_publications(pmids: list[str]) -> list[dict]:
     return papers
 
 
-def discover_publications(orcid: str, *, start_date: date | None = None, end_date: date | None = None) -> list[dict]:
-    return fetch_publications(search_publications_by_orcid(orcid, start_date=start_date, end_date=end_date))
+def discover_publications(orcid: str | None = None, *, name: str | None = None, start_date: date | None = None, end_date: date | None = None) -> list[dict]:
+    if orcid:
+        pmids = search_publications_by_orcid(orcid, start_date=start_date, end_date=end_date)
+    elif name:
+        pmids = search_publications_by_name(name, start_date=start_date, end_date=end_date)
+    else:
+        raise ValueError("Researcher ORCID or name is required")
+    return fetch_publications(pmids)

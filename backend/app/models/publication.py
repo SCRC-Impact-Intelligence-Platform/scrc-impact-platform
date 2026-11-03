@@ -48,9 +48,9 @@ class Publication(Base):
         nullable=True,
     )
 
-    first_discovered_by_orcid: Mapped[str] = mapped_column(
+    first_discovered_by_orcid: Mapped[str | None] = mapped_column(
         String(19),
-        nullable=False,
+        nullable=True,
     )
 
     discovered_at: Mapped[datetime] = mapped_column(

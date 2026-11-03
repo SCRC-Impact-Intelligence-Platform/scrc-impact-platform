@@ -17,7 +17,7 @@ class PublicationResponse(BaseModel):
     publication_date: str | None
     doi: str | None
     abstract: str | None
-    first_discovered_by_orcid: str
+    first_discovered_by_orcid: str | None
     discovered_at: datetime
 
     status: PublicationStatus

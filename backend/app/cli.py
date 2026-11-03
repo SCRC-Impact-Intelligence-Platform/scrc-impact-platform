@@ -20,16 +20,17 @@ def main(months: int = 3):
         total = 0
         failures = 0
         for researcher in researchers:
-            print(f"Researcher: {researcher.name} (ORCID {researcher.orcid})")
+            method = "ORCID" if researcher.orcid else "NAME (review required)"
+            print(f"Researcher: {researcher.name} (search: {method})")
             try:
-                papers = discover_publications(researcher.orcid, start_date=start, end_date=end)
+                papers = discover_publications(researcher.orcid, name=researcher.name, start_date=start, end_date=end)
                 new = save_publications(db=db, source_orcid=researcher.orcid, publications=papers)
                 total += new
                 print(f"Found: {len(papers)}; new: {new}; with DOI: {sum(bool(p['doi']) for p in papers)}; with abstract: {sum(bool(p['abstract']) for p in papers)}")
             except Exception as exc:
                 db.rollback()
                 failures += 1
-                print(f"FAILED for {researcher.orcid}: {type(exc).__name__}: {exc}")
+                print(f"FAILED for {researcher.name}: {type(exc).__name__}: {exc}")
         print(f"Total new publications: {total}; failed researchers: {failures}")
         if failures:
             raise SystemExit(1)

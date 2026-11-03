@@ -21,3 +21,8 @@ class ResourceType(StrEnum):
     EQUIPMENT = "EQUIPMENT"
     FUNDING = "FUNDING"
     SERVICE = "SERVICE"
+
+
+class PublicationConfidence(StrEnum):
+    HIGH = "HIGH"
+    LOW = "LOW"
