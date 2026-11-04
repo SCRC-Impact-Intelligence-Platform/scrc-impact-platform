@@ -22,6 +22,7 @@ router = APIRouter(
 def list_publications(
     status: PublicationStatus | None = None,
     confidence: PublicationConfidence | None = None,
+    researcher_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -30,6 +31,9 @@ def list_publications(
 
     if status is not None:
         stmt = stmt.where(Publication.status == status)
+
+    if researcher_id is not None:
+        stmt = stmt.where(Publication.first_discovered_researcher_id == researcher_id)
 
     if confidence == PublicationConfidence.HIGH:
         stmt = stmt.where(Publication.first_discovered_by_orcid.is_not(None))

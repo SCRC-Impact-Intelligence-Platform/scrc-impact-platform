@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, JSON, String, Text
+from sqlalchemy import DateTime, JSON, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -46,6 +46,10 @@ class Publication(Base):
     abstract: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+    first_discovered_researcher_id: Mapped[int | None] = mapped_column(
+        ForeignKey("researchers.id"), nullable=True, index=True
     )
 
     first_discovered_by_orcid: Mapped[str | None] = mapped_column(

@@ -7,6 +7,7 @@ class PublicationSelection(BaseModel):
 
 
 class FormCreate(BaseModel):
+    researcher_id: int
     items: list[PublicationSelection] = Field(min_length=1)
 
 
@@ -27,6 +28,9 @@ class FormQuestionResponse(BaseModel):
 class FormBatchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    researcher_id: int | None
+    invitation_to: str | None
+    invitation_sent_at: datetime | None
     google_form_id: str | None
     responder_url: str | None
     state: FormBatchState

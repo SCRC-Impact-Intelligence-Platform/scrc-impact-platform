@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, RefreshCw, Search, X } from 'lucide-react'
 import { PageHeader } from '../components/common/PageHeader'
+import { researchersApi } from '../features/directory/api'
 import { Feedback, secondaryButton } from '../features/directory/DirectoryUI'
 import {
   publicationsApi,
@@ -175,6 +176,8 @@ export default function PublicationsPage() {
     queryKey: ['publications', filters],
     queryFn: () => publicationsApi.list(filters),
   })
+  const researchers = useQuery({ queryKey: ['researchers'], queryFn: researchersApi.list })
+  const nameFor = (id: number | null) => researchers.data?.find((item) => item.id === id)?.name ?? (id === null ? 'Unknown (historical)' : `Researcher #${id}`)
   const detail = useQuery({
     queryKey: ['publication', selectedId],
     queryFn: () => publicationsApi.get(selectedId!),
@@ -287,6 +290,7 @@ export default function PublicationsPage() {
                   <tr>
                     <th className="px-5 py-4">Publication</th>
                     <th className="px-5 py-4">Journal / Date</th>
+                    <th className="px-5 py-4">Discovered for</th>
                     <th className="px-5 py-4">Confidence</th>
                     <th className="px-5 py-4">Status</th>
                     <th className="px-5 py-4 text-right">Details</th>
@@ -309,6 +313,7 @@ export default function PublicationsPage() {
                         <p>{p.journal || 'Unknown journal'}</p>
                         <p className="mt-1 text-xs">{p.publication_date || 'No date'}</p>
                       </td>
+                      <td className="px-5 py-4 text-slate-700">{nameFor(p.first_discovered_researcher_id)}</td>
                       <td className="px-5 py-4">
                         <ConfidencePill orcid={p.first_discovered_by_orcid} />
                       </td>

@@ -24,7 +24,7 @@ def main(months: int = 3):
             print(f"Researcher: {researcher.name} (search: {method})")
             try:
                 papers = discover_publications(researcher.orcid, name=researcher.name, start_date=start, end_date=end)
-                new = save_publications(db=db, source_orcid=researcher.orcid, publications=papers)
+                new = save_publications(db=db, source_orcid=researcher.orcid, source_researcher_id=researcher.id, publications=papers)
                 total += new
                 print(f"Found: {len(papers)}; new: {new}; with DOI: {sum(bool(p['doi']) for p in papers)}; with abstract: {sum(bool(p['abstract']) for p in papers)}")
             except Exception as exc:
