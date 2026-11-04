@@ -1,41 +1,55 @@
-# SCRC Google Forms → Email Invitation (local-only MVP)
+## SMTP Configuration (Local Development)
 
-## Flow
+The backend supports sending Google Forms verification invitations through the UCI SMTP relay.
 
-1. Researchers have emails and optionally ORCIDs. Discovery sets `first_discovered_researcher_id` for **new** publications. This is the first discoverer, not proof of authorship.
-2. On `/forms`, choose a researcher, then pending publications first discovered for that researcher; choose candidate resources for each.
-3. `POST /forms` creates a Google Form and a `READY` FormBatch containing the designated `researcher_id`.
-4. `GET /forms/{batch_id}/invitation-draft` builds the default recipient, subject and body with the genuine Form URL. The browser allows editing the subject/body.
-5. `POST /forms/{batch_id}/send-invitation` sends plain text with SMTP STARTTLS **only if** the deployment explicitly enables sending and the researcher email is allowlisted. SMTP accepted does **not** prove delivery. A successful SMTP acceptance marks batch/Publications `SENT`; scheduled Sync continues until `COMPLETED`.
+### Setup
 
-## Schema / local DB reset required
+From the `backend/` directory:
 
-This change adds `publications.first_discovered_researcher_id` and `form_batches.researcher_id`, `invitation_to`, `invitation_sent_at`. SQLAlchemy `create_all()` **does not alter existing tables**. For a disposable local SQLite DB, stop the FastAPI process and CLI, then rename/delete `backend/local.db` and restart FastAPI. You will lose all test researchers/resources/publications/forms/attributions; rebuild test data and rerun discovery to populate new source IDs. For persisted data, write a reviewed Alembic migration instead; do not simply delete production data.
-
-## SMTP configuration
-
-Joseph's C# snippet indicates `mta.service.uci.edu:587`, STARTTLS, sender `DoNotReply@uci.edu`, and no default OS credentials. It **does not** prove anonymous sending is permitted or that your account/server is authorized. Obtain explicit confirmation of supported network, sender identity, authentication, and whether UCI VPN/internal server access is required.
-
-By default sending is disabled. Copy `backend/.env.example` to `backend/.env`
-(which is Git-ignored), then edit its values. Install dependencies once per venv:
+**1. Install dependencies**
 
 ```bash
 python -m pip install -e ".[dev]"
 ```
 
-The app automatically loads `backend/.env` at startup. Explicit shell environment
-variables take precedence. Start it normally:
+**2. Create a local environment file**
 
 ```bash
-python -m uvicorn app.main:app --reload --host 127.0.0.1
+cp .env.example .env
 ```
 
-Use `SMTP_ENABLE_SEND=false` until IT authorizes the relay/sender, then enable
-only when testing to a controlled recipient in `SMTP_ALLOWED_RECIPIENTS`. The
-optional SMTP username/password are needed only if IT requires authentication.
+**3. Configure `.env`**
 
-Never put SMTP credentials in Git, browser code, or Docker images. `defaultCredentials=false` means not to use default OS credentials; it does **not** imply no credentials. On port 587 use `starttls()`, not `SMTP_SSL()` (implicit TLS).
+```dotenv
+SMTP_HOST=mta.service.uci.edu
+SMTP_PORT=587
+SMTP_FROM=DoNotReply@uci.edu
+SMTP_ENABLE_SEND=true
+SMTP_ALLOWED_RECIPIENTS=your-email@uci.edu
+```
 
-**Security boundary:** The existing FastAPI admin routes have no authentication. This workflow is for localhost development only. Do not expose these endpoints on a network or enable broad recipient sending until administrator authentication, authorization, CSRF protection (if cookie sessions), delivery auditing, rate limiting, recipient restrictions, retry/idempotency policy, and deployment-approved credential storage are implemented. Sending may be accepted by SMTP yet DB commit fail, so retry requires reconciliation to prevent duplicates.
+Replace `your-email@uci.edu` with an email address you control. Only enable sending when authorized to use the UCI SMTP relay.
 
-Existing `POST /forms/{id}/mark-sent` is a manual marker; do not use it for SMTP sending. Do not place secrets in uploaded ZIP archives.
+**4. Start the backend**
+
+```bash
+python -m uvicorn app.main:app --reload
+```
+
+The backend automatically loads `.env` at startup. No manual `export` commands are required.
+
+### Testing Email Invitations
+
+1. Start the frontend with `npm run dev`.
+2. Open `/forms` and select a researcher with a test email address.
+3. Select publications and resources, then generate a Google Form.
+4. Click **Compose invitation**, review the email, and click **Send invitation**.
+5. Verify that the email arrives in your inbox and the Form Batch and Publications are marked `SENT`.
+
+### Notes
+
+- `.env` is Git-ignored and must not be committed.
+- `.env.example` is committed as a configuration template.
+- SMTP credentials are optional and should only be configured if required by UCI IT.
+- `SMTP_ALLOWED_RECIPIENTS` restricts outgoing email to approved test recipients.
+- SMTP acceptance does not guarantee inbox delivery.

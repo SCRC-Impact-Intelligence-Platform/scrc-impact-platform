@@ -106,3 +106,8 @@ backend/.secrets/google_token.json
 - Google refresh tokens issued in this mode generally expire after 7 days for the Forms scopes.
 - Run `python -m app.google_auth` again if reauthorization is required.
 - Production authentication and credential management will be configured separately.
+
+### Email Invitations
+
+For SMTP setup and local email testing, see
+[EMAIL_WORKFLOW.md](EMAIL_WORKFLOW.md#smtp-configuration-local-development).
