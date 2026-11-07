@@ -28,7 +28,8 @@ first day of the month, N months before the current month, and ends today.
 For example, on 2026-11-01, `--months 36` searches 2023-11-01 through
 2026-11-01.
 
-The CLI searches PubMed by each active researcher's ORCID, filters by
+The CLI searches PubMed by ORCID when available, otherwise by author name
+restricted to UCI affiliation (name-based results still require review). It filters by
 **publication date**, paginates through search results, and retrieves metadata
 using EFetch (including DOI and abstract when PubMed provides them).
 Only PMIDs not already in the database are inserted; running the same search
@@ -107,7 +108,18 @@ backend/.secrets/google_token.json
 - Run `python -m app.google_auth` again if reauthorization is required.
 - Production authentication and credential management will be configured separately.
 
-### Email Invitations
+## Three-question Verification and Criticality
+
+Generated Google Forms ask each selected publication about SCRC resource use
+(`Yes / No / Unsure`), equipment (including free-text `Other`), and overall
+criticality (`Critical / Significant / Minor`). Confirmed equipment selections
+are stored in `publication_resources` with the same criticality for all selected
+machines. `Unsure` and unresolved `Other` answers are tracked separately.
+
+See [FORM_CRITICALITY.md](FORM_CRITICALITY.md) for the complete response-to-status
+mapping, sync validation rules, and local database reset implications.
+
+## Email Invitations
 
 For SMTP setup and local email testing, see
 [EMAIL_WORKFLOW.md](EMAIL_WORKFLOW.md#smtp-configuration-local-development).

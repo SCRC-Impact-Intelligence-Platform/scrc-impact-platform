@@ -23,6 +23,10 @@ class FormQuestionResponse(BaseModel):
     resource_ids: list[int]
     yes_question_id: str
     resources_question_id: str
+    criticality_question_id: str
+    usage_answer: str | None
+    other_resource_text: str | None
+    reported_criticality: str | None
 
 
 class FormBatchResponse(BaseModel):

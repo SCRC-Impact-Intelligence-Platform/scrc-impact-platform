@@ -24,29 +24,109 @@ def get_forms_service():
     return build("forms", "v1", credentials=creds, cache_discovery=False)
 
 
-def create_google_form(items: list[dict]) -> tuple[str, str, list[tuple[str, str]]]:
-    """Returns Google form ID, responder URL, and question-ID pairs per publication."""
+def _radio_item(title: str, values: list[str], *, required: bool) -> dict:
+    return {
+        "title": title,
+        "questionItem": {"question": {
+            "required": required,
+            "choiceQuestion": {
+                "type": "RADIO",
+                "options": [{"value": value} for value in values],
+                "shuffle": False,
+            },
+        }},
+    }
+
+
+def create_google_form(
+    items: list[dict], *, batch_id: int | None = None, researcher_name: str | None = None
+) -> tuple[str, str, list[tuple[str, str, str]]]:
+    """Create a respondent-name prompt plus three questions per publication.
+
+    The respondent name stays in Google Forms only; it is not returned in
+    the publication question-ID triples or persisted by response sync.
+    """
+    if not items:
+        raise ValueError("No publications selected")
     service = get_forms_service()
-    created = service.forms().create(body={"info": {"title": "SCRC Publication Attribution Verification"}}).execute()
+    title = "SCRC Publication Attribution Verification"
+    # documentTitle controls the file name shown in Google Forms / Drive.
+    # Keep the responder-facing title short, but distinguish owner-side batches.
+    parts = ["SCRC Verification"]
+    if batch_id is not None:
+        parts.append(f"Batch #{batch_id}")
+    if researcher_name:
+        parts.append(researcher_name.strip()[:80])
+    parts.append(f"{len(items)} publication(s)")
+    document_title = " | ".join(parts)
+    created = service.forms().create(
+        body={"info": {"title": title, "documentTitle": document_title}}
+    ).execute()
     form_id = created["formId"]
-    requests = []
+    # One form-level question, unrelated to any specific publication.
+    # We intentionally do not store or interpret this answer in our DB.
+    name_question = {
+        "title": "Your full name",
+        "questionItem": {"question": {
+            "required": True,
+            "textQuestion": {"paragraph": False},
+        }},
+    }
+    requests = [{"createItem": {"item": name_question, "location": {"index": 0}}}]
     for item in items:
         title = f"PMID {item['pmid']}: {item['title'][:180]}"
-        requests.append({"createItem": {"item": {"title": f"{title} — Were any listed SCRC resources used?", "questionItem": {"question": {"required": True, "choiceQuestion": {"type": "RADIO", "options": [{"value": "Yes"}, {"value": "No"}], "shuffle": False}}}}, "location": {"index": len(requests)}}})
-        requests.append({"createItem": {"item": {"title": f"{title} — If Yes, select resources used (otherwise leave empty)", "questionItem": {"question": {"required": False, "choiceQuestion": {"type": "CHECKBOX", "options": [{"value": f"{r['id']}: {r['name']}"} for r in item['resources']], "shuffle": False}}}}, "location": {"index": len(requests)}}})
-    if not requests:
-        raise ValueError("No publications selected")
-    result = service.forms().batchUpdate(formId=form_id, body={"requests": requests}).execute()
-    pairs = []
+        equipment_options = [
+            {"value": f"{r['id']}: {r['name']}"} for r in item["resources"]
+        ]
+        # Plain checkbox option: respondents select it without typing free text.
+        equipment_options.append({"value": "Other (not listed)"})
+        questions = [
+            _radio_item(
+                f"{title} — Were any SCRC resources used?",
+                ["Yes", "No", "Unsure"],
+                required=True,
+            ),
+            {
+                "title": f"{title} — If Yes, which SCRC resources were used? (Other if not listed)",
+                "questionItem": {"question": {
+                    "required": False,
+                    "choiceQuestion": {
+                        "type": "CHECKBOX",
+                        "options": equipment_options,
+                        "shuffle": False,
+                    },
+                }},
+            },
+            _radio_item(
+                f"{title} — If Yes, how critical were the selected resources overall?",
+                ["Critical", "Significant", "Minor"],
+                required=False,
+            ),
+        ]
+        for question in questions:
+            requests.append({"createItem": {
+                "item": question,
+                "location": {"index": len(requests)},
+            }})
+    result = service.forms().batchUpdate(
+        formId=form_id, body={"requests": requests}
+    ).execute()
     replies = result["replies"]
-    for index in range(0, len(replies), 2):
-        pairs.append((replies[index]["createItem"]["questionId"][0], replies[index+1]["createItem"]["questionId"][0]))
+    triples = []
+    # First reply belongs to the standalone name question, not to a paper.
+    for index in range(1, len(replies), 3):
+        triples.append(tuple(
+            replies[index + offset]["createItem"]["questionId"][0]
+            for offset in range(3)
+        ))
     service.forms().setPublishSettings(
         formId=form_id,
-        body={"publishSettings": {"publishState": {"isPublished": True, "isAcceptingResponses": True}}, "updateMask": "publishState"},
+        body={"publishSettings": {"publishState": {
+            "isPublished": True, "isAcceptingResponses": True,
+        }}, "updateMask": "publishState"},
     ).execute()
     form = service.forms().get(formId=form_id).execute()
-    return form_id, form["responderUri"], pairs
+    return form_id, form["responderUri"], triples
 
 
 def get_responses(form_id: str) -> list[dict]:

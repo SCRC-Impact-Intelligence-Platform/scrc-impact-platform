@@ -12,7 +12,15 @@ import {
 } from '../features/publications/api'
 
 const PAGE_SIZE = 20
-const statuses: PublicationStatus[] = ['PENDING', 'SENT', 'CONFIRMED', 'REJECTED', 'DISMISSED']
+const statuses: PublicationStatus[] = [
+  'PENDING',
+  'SENT',
+  'CONFIRMED',
+  'REJECTED',
+  'UNSURE',
+  'NEEDS_REVIEW',
+  'DISMISSED',
+]
 
 function StatusPill({ status }: { status: PublicationStatus }) {
   const colors: Record<PublicationStatus, string> = {
@@ -20,6 +28,8 @@ function StatusPill({ status }: { status: PublicationStatus }) {
     SENT: 'bg-blue-50 text-blue-800',
     CONFIRMED: 'bg-emerald-50 text-emerald-800',
     REJECTED: 'bg-rose-50 text-rose-800',
+    UNSURE: 'bg-amber-50 text-amber-800',
+    NEEDS_REVIEW: 'bg-purple-50 text-purple-800',
     DISMISSED: 'bg-slate-100 text-slate-700',
   }
   return (
@@ -56,6 +66,10 @@ function PublicationDetails({
   publication: Publication
   onClose: () => void
 }) {
+  const attributionQuery = useQuery({
+    queryKey: ['publication-attributions', publication.id],
+    queryFn: () => publicationsApi.attributions(publication.id),
+  })
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-slate-950/50"
@@ -92,6 +106,22 @@ function PublicationDetails({
           </button>
         </header>
         <div className="space-y-6 overflow-y-auto p-6 text-sm text-slate-700">
+          <section className="rounded-lg border border-slate-200 p-3">
+            <h3 className="font-semibold text-slate-900">Verified resource attributions</h3>
+            {attributionQuery.isLoading && <p className="mt-2">Loading attributions…</p>}
+            {attributionQuery.isError && (
+              <p className="mt-2 text-rose-700">Unable to load attributions.</p>
+            )}
+            {attributionQuery.data?.length === 0 && (
+              <p className="mt-2 text-slate-500">No verified resources yet.</p>
+            )}
+            {attributionQuery.data?.map((attribution) => (
+              <p key={attribution.resource_id} className="mt-2">
+                {attribution.resource_name} —{' '}
+                <span className="font-semibold">{attribution.criticality}</span>
+              </p>
+            ))}
+          </section>
           <dl className="grid gap-4 sm:grid-cols-2">
             <div>
               <dt className="font-semibold text-slate-900">PMID</dt>
@@ -177,7 +207,9 @@ export default function PublicationsPage() {
     queryFn: () => publicationsApi.list(filters),
   })
   const researchers = useQuery({ queryKey: ['researchers'], queryFn: researchersApi.list })
-  const nameFor = (id: number | null) => researchers.data?.find((item) => item.id === id)?.name ?? (id === null ? 'Unknown (historical)' : `Researcher #${id}`)
+  const nameFor = (id: number | null) =>
+    researchers.data?.find((item) => item.id === id)?.name ??
+    (id === null ? 'Unknown (historical)' : `Researcher #${id}`)
   const detail = useQuery({
     queryKey: ['publication', selectedId],
     queryFn: () => publicationsApi.get(selectedId!),
@@ -313,7 +345,9 @@ export default function PublicationsPage() {
                         <p>{p.journal || 'Unknown journal'}</p>
                         <p className="mt-1 text-xs">{p.publication_date || 'No date'}</p>
                       </td>
-                      <td className="px-5 py-4 text-slate-700">{nameFor(p.first_discovered_researcher_id)}</td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {nameFor(p.first_discovered_researcher_id)}
+                      </td>
                       <td className="px-5 py-4">
                         <ConfidencePill orcid={p.first_discovered_by_orcid} />
                       </td>

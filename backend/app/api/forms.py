@@ -65,14 +65,23 @@ def create_form(payload: FormCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(batch)
     try:
-        form_id, uri, question_pairs = create_google_form(items)
+        form_id, uri, question_pairs = create_google_form(
+            items, batch_id=batch.id, researcher_name=researcher.name
+        )
     except Exception as exc:
         batch.state = FormBatchState.FAILED.value
         db.commit()
         raise HTTPException(502, f"Google Forms creation failed: {type(exc).__name__}")
     batch.google_form_id, batch.responder_url, batch.state = form_id, uri, FormBatchState.READY.value
-    for item, (qid_yes, qid_resources) in zip(items, question_pairs):
-        db.add(FormQuestion(batch_id=batch.id, publication_id=item["publication_id"], resource_ids=[r["id"] for r in item["resources"]], yes_question_id=qid_yes, resources_question_id=qid_resources))
+    for item, (qid_yes, qid_resources, qid_criticality) in zip(items, question_pairs):
+        db.add(FormQuestion(
+            batch_id=batch.id,
+            publication_id=item["publication_id"],
+            resource_ids=[r["id"] for r in item["resources"]],
+            yes_question_id=qid_yes,
+            resources_question_id=qid_resources,
+            criticality_question_id=qid_criticality,
+        ))
     db.commit()
     return {"batch_id": batch.id, "google_form_id": form_id, "responder_url": uri, "state": batch.state}
 

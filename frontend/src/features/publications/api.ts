@@ -1,6 +1,13 @@
 import { apiRequest } from '../../app/api'
 
-export type PublicationStatus = 'PENDING' | 'SENT' | 'CONFIRMED' | 'REJECTED' | 'DISMISSED'
+export type PublicationStatus =
+  'PENDING' | 'SENT' | 'CONFIRMED' | 'REJECTED' | 'UNSURE' | 'NEEDS_REVIEW' | 'DISMISSED'
+export type ResourceAttribution = {
+  resource_id: number
+  resource_name: string
+  criticality: 'CRITICAL' | 'SIGNIFICANT' | 'MINOR'
+}
+
 export type PublicationConfidence = 'HIGH' | 'LOW'
 
 export type Publication = {
@@ -35,4 +42,6 @@ export const publicationsApi = {
     return apiRequest<Publication[]>(`/publications?${params.toString()}`)
   },
   get: (id: number) => apiRequest<Publication>(`/publications/${id}`),
+  attributions: (id: number) =>
+    apiRequest<ResourceAttribution[]>(`/publications/${id}/attributions`),
 }

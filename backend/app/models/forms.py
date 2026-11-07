@@ -30,6 +30,11 @@ class FormQuestion(Base):
     resource_ids: Mapped[list] = mapped_column(JSON)
     yes_question_id: Mapped[str] = mapped_column(String(255))
     resources_question_id: Mapped[str] = mapped_column(String(255))
+    criticality_question_id: Mapped[str] = mapped_column(String(255))
+    # Persist the researcher's original answers, even when no attribution exists.
+    usage_answer: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    other_resource_text: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    reported_criticality: Mapped[str | None] = mapped_column(String(20), nullable=True)
     __table_args__ = (UniqueConstraint("batch_id", "publication_id"),)
 
 

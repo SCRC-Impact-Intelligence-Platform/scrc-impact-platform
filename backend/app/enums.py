@@ -14,7 +14,15 @@ class PublicationStatus(StrEnum):
     SENT = "SENT"
     CONFIRMED = "CONFIRMED"
     REJECTED = "REJECTED"
+    UNSURE = "UNSURE"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
     DISMISSED = "DISMISSED"
+
+
+class ResourceCriticality(StrEnum):
+    CRITICAL = "CRITICAL"
+    SIGNIFICANT = "SIGNIFICANT"
+    MINOR = "MINOR"
 
 
 class ResourceType(StrEnum):
