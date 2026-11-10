@@ -123,3 +123,17 @@ mapping, sync validation rules, and local database reset implications.
 
 For SMTP setup and local email testing, see
 [EMAIL_WORKFLOW.md](EMAIL_WORKFLOW.md#smtp-configuration-local-development).
+
+## Sync Google Forms Responses
+
+Run from the `backend/` directory:
+
+```bash
+python -m app.sync_forms_cli
+```
+
+This synchronizes responses from SENT form batches.
+
+Alternatively, trigger the same sync through Swagger (`POST /forms/sync`).
+
+Use `python -m app.sync_forms_cli --help` to view CLI usage.
