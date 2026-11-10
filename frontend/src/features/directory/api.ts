@@ -19,6 +19,12 @@ export type ResearcherUpdate = {
 export type ResourceCreate = { name: string; type: ResourceType }
 export type ResourceUpdate = { name?: string; type?: ResourceType; is_active?: boolean }
 
+/** Display name for a researcher id, with fallbacks for unknown or unattributed records. */
+export function researcherName(researchers: Researcher[] | undefined, id: number | null): string {
+  if (id === null) return 'Unknown (historical)'
+  return researchers?.find((r) => r.id === id)?.name ?? `Researcher #${id}`
+}
+
 const mutation = <T>(method: string, path: string, body?: object) =>
   apiRequest<T>(path, { method, ...(body ? { body: JSON.stringify(body) } : {}) })
 

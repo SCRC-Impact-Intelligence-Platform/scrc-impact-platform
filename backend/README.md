@@ -1,5 +1,17 @@
 # SCRC Backend
 
+## Database schema
+
+The API and the discovery CLI create any missing tables from the models when
+they start. There are no migrations; see the root README for resetting the
+local database.
+
+## Running tests
+
+```bash
+DATABASE_URL=sqlite:// python -m unittest discover -s tests -v
+```
+
 ## PubMed publication discovery (CLI)
 
 Run from the `backend/` directory with the Python virtual environment active:
@@ -38,12 +50,6 @@ again does not duplicate publications or reset their review status.
 > PubMed records may not have a DOI or abstract, so either field can still be
 > `null`. A publication-date window may also omit older papers newly indexed
 > by PubMed. The CLI writes to the configured local database.
-
-### Tests
-
-```bash
-python -m unittest discover -s tests -v
-```
 
 ### View imported records
 

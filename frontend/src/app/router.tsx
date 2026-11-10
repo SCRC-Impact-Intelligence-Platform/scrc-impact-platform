@@ -6,6 +6,7 @@ import PublicationsPage from '../pages/PublicationsPage'
 import FormsPage from '../pages/FormsPage'
 import ResourcesPage from '../pages/ResourcesPage'
 import AttributionsPage from '../pages/AttributionsPage'
+import ReportsPage from '../pages/ReportsPage'
 import SettingsPage from '../pages/SettingsPage'
 import NotFoundPage from '../pages/NotFoundPage'
 
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: 'forms', element: <FormsPage /> },
       { path: 'resources', element: <ResourcesPage /> },
       { path: 'attributions', element: <AttributionsPage /> },
+      { path: 'reports', element: <ReportsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
