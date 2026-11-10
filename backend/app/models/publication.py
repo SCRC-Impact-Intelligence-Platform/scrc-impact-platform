@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, JSON, String, Unicode
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Unicode
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -48,9 +48,13 @@ class Publication(Base):
         nullable=True,
     )
 
-    first_discovered_by_orcid: Mapped[str] = mapped_column(
+    first_discovered_researcher_id: Mapped[int | None] = mapped_column(
+        ForeignKey("researchers.id"), nullable=True, index=True
+    )
+
+    first_discovered_by_orcid: Mapped[str | None] = mapped_column(
         String(19),
-        nullable=False,
+        nullable=True,
     )
 
     discovered_at: Mapped[datetime] = mapped_column(

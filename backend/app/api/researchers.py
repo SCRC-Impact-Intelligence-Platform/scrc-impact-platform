@@ -89,14 +89,21 @@ def update_researcher(
     changes = payload.model_dump(exclude_unset=True)
 
     for field, value in changes.items():
-        if value is None:
+        if value is None and field != "orcid":
             raise HTTPException(
                 status_code=422,
                 detail=f"{field} cannot be null",
             )
         setattr(researcher, field, value)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Researcher ORCID already exists",
+        )
     db.refresh(researcher)
 
     return researcher

@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.enums import PublicationConfidence
 from app.models.publication import Publication
 from app.schemas.publication import (
     PublicationResponse,
@@ -20,6 +21,8 @@ router = APIRouter(
 @router.get("", response_model=list[PublicationResponse])
 def list_publications(
     status: PublicationStatus | None = None,
+    confidence: PublicationConfidence | None = None,
+    researcher_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -28,6 +31,14 @@ def list_publications(
 
     if status is not None:
         stmt = stmt.where(Publication.status == status)
+
+    if researcher_id is not None:
+        stmt = stmt.where(Publication.first_discovered_researcher_id == researcher_id)
+
+    if confidence == PublicationConfidence.HIGH:
+        stmt = stmt.where(Publication.first_discovered_by_orcid.is_not(None))
+    elif confidence == PublicationConfidence.LOW:
+        stmt = stmt.where(Publication.first_discovered_by_orcid.is_(None))
 
     stmt = (
         stmt.order_by(Publication.id.desc())

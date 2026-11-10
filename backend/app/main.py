@@ -1,3 +1,10 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Local settings; explicit environment variables take precedence.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
@@ -11,7 +18,7 @@ from app.api.publications import router as publications_router
 from app.api.forms import router as forms_router
 from app.api.attributions import router as attributions_router
 from app.models.forms import FormBatch, FormQuestion, SyncedFormResponse
-from app.models.publication_resource import publication_resources
+from app.models.publication_resource import PublicationResource  # noqa: F401
 
 
 app = FastAPI(

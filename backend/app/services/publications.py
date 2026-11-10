@@ -6,8 +6,9 @@ from app.models.publication import Publication
 
 def save_publications(
     db: Session,
-    source_orcid: str,
+    source_orcid: str | None,
     publications: list[dict],
+    source_researcher_id: int | None = None,
 ) -> int:
     new_count = 0
 
@@ -31,6 +32,7 @@ def save_publications(
             doi=data.get("doi"),
             abstract=data.get("abstract"),
             first_discovered_by_orcid=source_orcid,
+            first_discovered_researcher_id=source_researcher_id,
             status="PENDING",
         )
 

@@ -16,10 +16,15 @@ class Researcher(Base):
         nullable=False,
     )
 
-    orcid: Mapped[str] = mapped_column(
+    email: Mapped[str] = mapped_column(
+        String(320),
+        nullable=False,
+    )
+
+    orcid: Mapped[str | None] = mapped_column(
         String(19),
         unique=True,
-        nullable=False,
+        nullable=True,
     )
 
     is_active: Mapped[bool] = mapped_column(

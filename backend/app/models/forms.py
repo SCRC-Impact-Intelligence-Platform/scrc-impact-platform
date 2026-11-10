@@ -13,6 +13,9 @@ def utcnow():
 class FormBatch(Base):
     __tablename__ = "form_batches"
     id: Mapped[int] = mapped_column(primary_key=True)
+    researcher_id: Mapped[int | None] = mapped_column(ForeignKey("researchers.id"), nullable=True)
+    invitation_to: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    invitation_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     google_form_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     responder_url: Mapped[str | None] = mapped_column(String(2048))
     state: Mapped[str] = mapped_column(String(20), default=FormBatchState.CREATING.value)
@@ -27,6 +30,11 @@ class FormQuestion(Base):
     resource_ids: Mapped[list] = mapped_column(JSON)
     yes_question_id: Mapped[str] = mapped_column(String(255))
     resources_question_id: Mapped[str] = mapped_column(String(255))
+    criticality_question_id: Mapped[str] = mapped_column(String(255))
+    # Persist the researcher's original answers, even when no attribution exists.
+    usage_answer: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    other_resource_text: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    reported_criticality: Mapped[str | None] = mapped_column(String(20), nullable=True)
     __table_args__ = (UniqueConstraint("batch_id", "publication_id"),)
 
 

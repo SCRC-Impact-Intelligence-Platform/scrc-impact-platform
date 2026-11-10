@@ -2,7 +2,10 @@
 const BASE = '/api'
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message)
     this.name = 'ApiError'
   }
@@ -24,7 +27,9 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
         const detail = (data as { detail: unknown }).detail
         message = typeof detail === 'string' ? detail : JSON.stringify(detail)
       }
-    } catch { /* non-JSON error */ }
+    } catch {
+      /* non-JSON error */
+    }
     throw new ApiError(response.status, message)
   }
   if (response.status === 204) return undefined as T
