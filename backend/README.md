@@ -1,5 +1,21 @@
 # SCRC Backend
 
+## Database schema
+
+Migrations live in `alembic/versions/`; apply them with `alembic upgrade head`.
+The API and CLIs check the schema at startup and refuse to run if the database
+is behind (`python -m app.migrate` runs the same check). See the root README
+for generating migrations.
+
+## Running tests
+
+```bash
+DATABASE_URL=sqlite:// python -m unittest discover -s tests -v
+```
+
+`tests/test_migrations.py` runs the migrations against a real SQL Server in
+Docker (`pip install -e ".[dev]"`); it is skipped when Docker isn't available.
+
 ## PubMed publication discovery (CLI)
 
 Run from the `backend/` directory with the Python virtual environment active:
@@ -38,12 +54,6 @@ again does not duplicate publications or reset their review status.
 > PubMed records may not have a DOI or abstract, so either field can still be
 > `null`. A publication-date window may also omit older papers newly indexed
 > by PubMed. The CLI writes to the configured local database.
-
-### Tests
-
-```bash
-python -m unittest discover -s tests -v
-```
 
 ### View imported records
 

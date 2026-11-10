@@ -2,6 +2,7 @@ import argparse
 from datetime import date
 from sqlalchemy import select
 from app.database import SessionLocal
+from app.migrate import check_schema_current
 from app.models.researcher import Researcher
 from app.services.pubmed import discover_publications, months_ago
 from app.services.publications import save_publications
@@ -10,6 +11,7 @@ from app.services.publications import save_publications
 def main(months: int = 3):
     if months < 1:
         raise ValueError("--months must be a positive integer")
+    check_schema_current()
     end = date.today()
     start = months_ago(end, months)
     print(f"Publication date window: {start} to {end}")

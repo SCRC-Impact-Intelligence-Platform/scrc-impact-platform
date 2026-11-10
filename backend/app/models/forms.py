@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, JSON, String, DateTime, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, JSON, String, DateTime, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 from app.enums import FormBatchState
@@ -12,11 +12,20 @@ def utcnow():
 
 class FormBatch(Base):
     __tablename__ = "form_batches"
+    # Filtered so SQL Server allows many batches without a form yet.
+    __table_args__ = (
+        Index(
+            "uq_form_batches_google_form_id",
+            "google_form_id",
+            unique=True,
+            mssql_where=text("google_form_id IS NOT NULL"),
+        ),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     researcher_id: Mapped[int | None] = mapped_column(ForeignKey("researchers.id"), nullable=True)
     invitation_to: Mapped[str | None] = mapped_column(String(320), nullable=True)
     invitation_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    google_form_id: Mapped[str | None] = mapped_column(String(255), unique=True)
+    google_form_id: Mapped[str | None] = mapped_column(String(255))
     responder_url: Mapped[str | None] = mapped_column(String(2048))
     state: Mapped[str] = mapped_column(String(20), default=FormBatchState.CREATING.value)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

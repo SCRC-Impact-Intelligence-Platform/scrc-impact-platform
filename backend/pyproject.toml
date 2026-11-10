@@ -26,4 +26,7 @@ include = ["app*"]
 [project.optional-dependencies]
 dev = [
     "httpx2",
+    # SQL Server migration tests (tests/test_migrations.py); need Docker.
+    "testcontainers[mssql]>=4,<5",
+    "pymssql>=2.3,<3",
 ]

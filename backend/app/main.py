@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -9,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
 from app.database import engine
+from app.migrate import check_schema_current
 from app.models.researcher import Researcher
 from app.api.researchers import router as researchers_router
 from app.models.resource import Resource
@@ -21,9 +23,17 @@ from app.models.forms import FormBatch, FormQuestion, SyncedFormResponse
 from app.models.publication_resource import PublicationResource  # noqa: F401
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Schema changes come from `alembic upgrade head`, never from the API itself.
+    check_schema_current()
+    yield
+
+
 app = FastAPI(
     title="SCRC Impact Intelligence Platform",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(researchers_router)
