@@ -2,19 +2,15 @@
 
 ## Database schema
 
-Migrations live in `alembic/versions/`; apply them with `alembic upgrade head`.
-The API and CLIs check the schema at startup and refuse to run if the database
-is behind (`python -m app.migrate` runs the same check). See the root README
-for generating migrations.
+The API and the discovery CLI create any missing tables from the models when
+they start. There are no migrations; see the root README for resetting the
+local database.
 
 ## Running tests
 
 ```bash
 DATABASE_URL=sqlite:// python -m unittest discover -s tests -v
 ```
-
-`tests/test_migrations.py` runs the migrations against a real SQL Server in
-Docker (`pip install -e ".[dev]"`); it is skipped when Docker isn't available.
 
 ## PubMed publication discovery (CLI)
 

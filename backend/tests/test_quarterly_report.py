@@ -1,10 +1,8 @@
 """Quarterly report: CONFIRMED publications whose stored date falls in the quarter."""
 
-import importlib.util
 import unittest
 import zipfile
 from io import BytesIO
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -59,18 +57,6 @@ class ParseDateTests(unittest.TestCase):
         self.assertEqual(
             date_parts("2026 Oct"), {"publication_year": 2026, "publication_month": 10, "publication_day": None}
         )
-
-
-class FrozenMigrationParserTests(unittest.TestCase):
-    def test_matches_app_parser(self):
-        path = Path(__file__).resolve().parents[1] / "alembic/versions/c3e5a7b9d1f2_publication_date_parts.py"
-        spec = importlib.util.spec_from_file_location("date_parts_migration", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        for value in ["2026 Oct 12", "2026 3rd Quarter", "2011-12", "2026-03-05", "2026 03", "2026 Feb 30",
-                      "2026 Jan-Feb", "2025 Dec-2026 Jan", "2026", "2026 Spring", "x", None]:
-            with self.subTest(value=value):
-                self.assertEqual(module.date_parts(value), date_parts(value))
 
 
 def _pub(pmid, date, status="CONFIRMED"):

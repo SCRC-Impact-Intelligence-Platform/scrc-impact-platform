@@ -9,8 +9,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
-from app.database import engine
-from app.migrate import check_schema_current
+from app.database import Base, engine
 from app.models.researcher import Researcher
 from app.api.researchers import router as researchers_router
 from app.models.resource import Resource
@@ -26,8 +25,7 @@ from app.models.publication_resource import PublicationResource  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Schema changes come from `alembic upgrade head`, never from the API itself.
-    check_schema_current()
+    Base.metadata.create_all(bind=engine)
     yield
 
 

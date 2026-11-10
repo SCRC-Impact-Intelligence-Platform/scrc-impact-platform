@@ -39,19 +39,12 @@ docker compose down -v           # stop and wipe the local database
 `GET /health/db` returns 503 when the database is unreachable (use it as the
 Kubernetes readiness probe).
 
-### Schema changes (Alembic)
+### Schema (development)
 
-Tables are managed by Alembic migrations in `backend/alembic/versions/`. The
-container runs `alembic upgrade head` on startup, applying any new migrations.
-
-After changing a model, generate a migration (runs in the container, which has
-the SQL Server driver), review the file, and commit it with the model change:
+There are no migrations. The backend creates any missing tables from the
+SQLAlchemy models when it starts; it never changes or deletes existing tables.
+After changing a model, reset the local database so the tables are recreated:
 
 ```bash
-docker compose run --rm --user "$(id -u):$(id -g)" -v "$PWD/backend:/srv/backend" \
-  backend alembic revision --autogenerate -m "describe the change"
+docker compose down -v && docker compose up --build
 ```
-
-Autogenerate can't detect renames (it sees a drop + add, losing data), so
-check the generated file. `alembic upgrade head --sql` prints the SQL instead
-of running it, for a DBA to apply by hand.
