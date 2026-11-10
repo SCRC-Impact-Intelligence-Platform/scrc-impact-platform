@@ -43,12 +43,6 @@ def _csl_item(publication: Publication) -> dict:
     return item
 
 
-def _clean(entry: str) -> str:
-    """Drop the list number, and restore the date spacing citeproc-py loses ("2026Oct12")."""
-    entry = re.sub(r"^\d+\.\s*", "", entry)
-    return re.sub(r"\b(\d{4})([A-Z][a-z]{2})(\d{1,2})?\b", lambda m: " ".join(g for g in m.groups() if g), entry)
-
-
 def format_citations(publications: list[Publication]) -> dict[str, str]:
     """Citation text for each publication, keyed by PMID."""
     if not publications:
@@ -61,5 +55,5 @@ def format_citations(publications: list[Publication]) -> dict[str, str]:
         citation = Citation([CitationItem(publication.pmid.lower())])
         bibliography.register(citation)
         bibliography.cite(citation, lambda item: None)
-    entries = [_clean(str(entry)) for entry in bibliography.bibliography()]
+    entries = [str(entry) for entry in bibliography.bibliography()]
     return {p.pmid: entry for p, entry in zip(publications, entries)}

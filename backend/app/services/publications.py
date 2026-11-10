@@ -2,7 +2,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.publication import Publication
-from app.services.pubdates import stored_date_parts
 
 
 def save_publications(
@@ -30,7 +29,7 @@ def save_publications(
             authors=data["authors"],
             journal=data.get("journal"),
             publication_date=data.get("publication_date"),
-            **stored_date_parts(data),
+            **{part: data.get(part) for part in ("publication_year", "publication_month", "publication_day")},
             doi=data.get("doi"),
             abstract=data.get("abstract"),
             first_discovered_by_orcid=source_orcid,

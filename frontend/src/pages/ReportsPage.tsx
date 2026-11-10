@@ -4,7 +4,7 @@ import { ExternalLink, FileText } from 'lucide-react'
 import { PageHeader } from '../components/common/PageHeader'
 import { Feedback, primaryButton, secondaryButton } from '../features/directory/DirectoryUI'
 import { researcherName, researchersApi } from '../features/directory/api'
-import type { Publication } from '../features/publications/api'
+import { pubmedUrl, type Publication } from '../features/publications/api'
 import {
   periodLabel,
   recentPeriods,
@@ -147,7 +147,7 @@ export default function ReportsPage() {
                       {nameFor(p.first_discovered_researcher_id)} ·{' '}
                       <a
                         className="text-blue-700 underline underline-offset-2"
-                        href={`https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(p.pmid)}/`}
+                        href={pubmedUrl(p.pmid)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >

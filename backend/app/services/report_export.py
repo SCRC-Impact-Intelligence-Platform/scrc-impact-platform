@@ -12,6 +12,15 @@ _COLUMNS = (("#", 5), ("Title", 60), ("Authors", 40), ("Journal", 30), ("Date", 
             ("Researcher", 24), ("PMID", 12), ("DOI", 28), ("Citation", 80))
 
 
+_EXCLUDED_COLUMNS = (("Reason", 45), ("Title", 60), ("Date", 18), ("PMID", 12))
+
+
+def _write_header(sheet, columns, bold, wrap) -> None:
+    for column, (heading, width) in enumerate(columns):
+        sheet.write_string(0, column, heading, bold)
+        sheet.set_column(column, column, width, wrap)
+
+
 def period_label(year: int, quarter: int) -> str:
     months = ("Jan - Mar", "Apr - Jun", "Jul - Sep", "Oct - Dec")[quarter - 1]
     return f"Q{quarter} {year} ({months})"
@@ -31,9 +40,7 @@ def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
         bold, wrap = workbook.add_format({"bold": True}), workbook.add_format({"text_wrap": True, "valign": "top"})
         sheet = workbook.add_worksheet("Publications")
         sheet.freeze_panes(1, 0)
-        for column, (heading, width) in enumerate(_COLUMNS):
-            sheet.write_string(0, column, heading, bold)
-            sheet.set_column(column, column, width, wrap)
+        _write_header(sheet, _COLUMNS, bold, wrap)
         for row, p in enumerate(report["publications"], start=1):
             sheet.write_number(row, 0, row)
             values = (p.title, ", ".join(p.authors), p.journal or "", p.publication_date or "",
@@ -43,9 +50,7 @@ def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
                 # write_string, so a title starting with "=" can't become a formula.
                 sheet.write_string(row, column, value)
         excluded = workbook.add_worksheet("Not in a quarter")
-        for column, (heading, width) in enumerate((("Reason", 45), ("Title", 60), ("Date", 18), ("PMID", 12))):
-            excluded.write_string(0, column, heading, bold)
-            excluded.set_column(column, column, width, wrap)
+        _write_header(excluded, _EXCLUDED_COLUMNS, bold, wrap)
         row = 1
         for reason, publications in _excluded(report):
             for p in publications:

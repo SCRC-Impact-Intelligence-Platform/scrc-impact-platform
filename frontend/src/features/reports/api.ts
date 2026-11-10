@@ -1,4 +1,4 @@
-import { apiRequest } from '../../app/api'
+import { apiRequest, BASE } from '../../app/api'
 import type { Publication } from '../publications/api'
 
 export type QuarterlyReport = {
@@ -35,7 +35,7 @@ export function recentPeriods(count: number, today = new Date()): ReportingPerio
 
 /** Same-origin link to the report's Excel or PDF download. */
 export const reportExportUrl = ({ year, quarter }: ReportingPeriod, format: 'xlsx' | 'pdf') =>
-  `/api/reports/quarterly/export?year=${year}&quarter=${quarter}&format=${format}`
+  `${BASE}/reports/quarterly/export?year=${year}&quarter=${quarter}&format=${format}`
 
 export const reportsApi = {
   quarterly: ({ year, quarter }: ReportingPeriod) =>

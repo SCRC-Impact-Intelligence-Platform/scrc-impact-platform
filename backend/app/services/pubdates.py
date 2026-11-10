@@ -56,10 +56,3 @@ def structured_date_parts(year: str | None, month: str | None, day: str | None) 
         return None
     parts = _resolve(int(year), month.strip() if month else None, day.strip() if day else None)
     return dict(zip(("publication_year", "publication_month", "publication_day"), parts))
-
-
-def stored_date_parts(paper: dict) -> dict:
-    """Date columns for a fetched paper: its structured fields, else parsed from the text."""
-    if "publication_year" in paper:
-        return {k: paper[k] for k in ("publication_year", "publication_month", "publication_day")}
-    return date_parts(paper.get("publication_date"))

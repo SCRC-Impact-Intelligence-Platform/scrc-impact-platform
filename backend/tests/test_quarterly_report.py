@@ -46,7 +46,7 @@ class ParseDateTests(unittest.TestCase):
         self.assertIsNone(parse_date("unknown"))
 
     def test_structured_fields(self):
-        from app.services.pubdates import stored_date_parts, structured_date_parts
+        from app.services.pubdates import structured_date_parts
 
         keys = ("publication_year", "publication_month", "publication_day")
         self.assertEqual(structured_date_parts("2026", "Oct", "12"), dict(zip(keys, (2026, 10, 12))))
@@ -54,8 +54,6 @@ class ParseDateTests(unittest.TestCase):
         self.assertEqual(structured_date_parts("2026", "Feb", "30"), dict(zip(keys, (2026, 2, None))))
         self.assertEqual(structured_date_parts("2026", None, None), dict(zip(keys, (2026, None, None))))
         self.assertIsNone(structured_date_parts(None, "Oct", None))
-        # Text is the fallback when a paper carries no structured fields.
-        self.assertEqual(stored_date_parts({"publication_date": "2026 Oct"})["publication_month"], 10)
 
     def test_date_parts(self):
         self.assertEqual(
