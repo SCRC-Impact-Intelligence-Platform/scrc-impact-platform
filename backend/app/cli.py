@@ -16,7 +16,7 @@ def main(months: int = 3):
     start = months_ago(end, months)
     print(f"Publication date window: {start} to {end}")
     with SessionLocal() as db:
-        researchers = db.scalars(select(Researcher).where(Researcher.is_active.is_(True)).order_by(Researcher.id)).all()
+        researchers = db.scalars(select(Researcher).where(Researcher.is_active).order_by(Researcher.id)).all()
         print(f"Found {len(researchers)} active researchers")
         total = 0
         failures = 0
