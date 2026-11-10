@@ -8,6 +8,7 @@ import type { Publication } from '../features/publications/api'
 import {
   periodLabel,
   recentPeriods,
+  reportExportUrl,
   reportsApi,
   type ReportingPeriod,
 } from '../features/reports/api'
@@ -86,16 +87,26 @@ export default function ReportsPage() {
 
       {generated && (
         <div className="panel overflow-hidden">
-          <div className="border-b border-slate-200 p-5">
-            <h2 className="text-lg font-bold text-slate-900">
-              Verified publications · {periodLabel(generated)}
-            </h2>
-            {report.data && (
-              <p className="muted mt-1 text-sm">
-                {report.data.publications.length} publication
-                {report.data.publications.length === 1 ? '' : 's'}
-              </p>
-            )}
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-5">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Verified publications · {periodLabel(generated)}
+              </h2>
+              {report.data && (
+                <p className="muted mt-1 text-sm">
+                  {report.data.publications.length} publication
+                  {report.data.publications.length === 1 ? '' : 's'}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <a className={secondaryButton} href={reportExportUrl(generated, 'pdf')} download>
+                Export PDF
+              </a>
+              <a className={secondaryButton} href={reportExportUrl(generated, 'xlsx')} download>
+                Export Excel
+              </a>
+            </div>
           </div>
           {report.data && (
             <>

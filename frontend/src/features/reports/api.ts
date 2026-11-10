@@ -33,6 +33,10 @@ export function recentPeriods(count: number, today = new Date()): ReportingPerio
   return periods
 }
 
+/** Same-origin link to the report's Excel or PDF download. */
+export const reportExportUrl = ({ year, quarter }: ReportingPeriod, format: 'xlsx' | 'pdf') =>
+  `/api/reports/quarterly/export?year=${year}&quarter=${quarter}&format=${format}`
+
 export const reportsApi = {
   quarterly: ({ year, quarter }: ReportingPeriod) =>
     apiRequest<QuarterlyReport>(`/reports/quarterly?year=${year}&quarter=${quarter}`),

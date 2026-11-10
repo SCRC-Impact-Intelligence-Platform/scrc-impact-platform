@@ -1,45 +1,43 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, select
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.enums import PublicationStatus
-from app.models.publication import Publication
 from app.schemas.report import QuarterlyReportResponse
+from app.services.quarterly_report import quarterly_report_data, researcher_names
+from app.services.report_export import build_pdf, build_xlsx
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
+Year = Annotated[int, Query(ge=1900, le=2100)]
+Quarter = Annotated[int, Query(ge=1, le=4)]
+_MEDIA_TYPES = {
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "pdf": "application/pdf",
+}
+
 
 @router.get("/quarterly", response_model=QuarterlyReportResponse)
-def quarterly_report(
-    year: int = Query(ge=1900, le=2100),
-    quarter: int = Query(ge=1, le=4),
+def quarterly_report(year: Year, quarter: Quarter, db: Session = Depends(get_db)):
+    return quarterly_report_data(db, year, quarter)
+
+
+@router.get("/quarterly/export", response_class=Response)
+def export_quarterly_report(
+    year: Year,
+    quarter: Quarter,
+    format: Literal["xlsx", "pdf"],
     db: Session = Depends(get_db),
 ):
-    """Verified (CONFIRMED) publications whose PubMed date falls in a calendar quarter.
-
-    Uses the stored date parts (a date range counts in the quarter it starts in).
-    Publications from ``year`` with no month ("2026", "2026 Spring") can't be
-    placed in a quarter; they are returned separately as ``undated_publications``.
-    Publications with no readable year at all belong to no year, so they are
-    returned as ``no_date_publications`` on every report.
-    """
-    P = Publication
-    confirmed = select(P).where(P.status == PublicationStatus.CONFIRMED)
-    confirmed_in_year = confirmed.where(P.publication_year == year)
-    first_month = (quarter - 1) * 3 + 1
-    publications = db.scalars(
-        confirmed_in_year
-        .where(P.publication_month.between(first_month, first_month + 2))
-        # Missing day sorts first within its month; CASE is portable (no NULLS FIRST on SQL Server).
-        .order_by(P.publication_month, case((P.publication_day.is_(None), 0), else_=1), P.publication_day, P.id)
-    ).all()
-    undated = db.scalars(confirmed_in_year.where(P.publication_month.is_(None)).order_by(P.id)).all()
-    no_date = db.scalars(confirmed.where(P.publication_year.is_(None)).order_by(P.id)).all()
-    return {
-        "year": year,
-        "quarter": quarter,
-        "publications": publications,
-        "undated_publications": undated,
-        "no_date_publications": no_date,
-    }
+    """The quarterly report as an Excel workbook or PDF."""
+    report = quarterly_report_data(db, year, quarter)
+    if format == "xlsx":
+        content = build_xlsx(report, researcher_names(db, report["publications"]))
+    else:
+        content = build_pdf(report)
+    filename = f"verified-publications-{year}-Q{quarter}.{format}"
+    return Response(
+        content, media_type=_MEDIA_TYPES[format],
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

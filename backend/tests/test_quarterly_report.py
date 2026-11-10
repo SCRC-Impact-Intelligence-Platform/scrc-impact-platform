@@ -2,6 +2,8 @@
 
 import importlib.util
 import unittest
+import zipfile
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.reports import router
 from app.database import Base, get_db
 from app.models.publication import Publication
+from app.services.citations import format_citations
 from app.services.pubdates import date_parts, parse_date
 
 
@@ -129,5 +132,52 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
     def test_range_counts_in_starting_quarter(self):
         self.assertEqual([p["pmid"] for p in self.report(2025, 4)["publications"]], ["10"])
 
+    def test_excel_export(self):
+        with Session(self.engine) as db:
+            hostile = _pub("99", "2026 Mar 2")
+            hostile.title = "=HYPERLINK(1)"
+            db.add(hostile)
+            db.commit()
+        response = self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=xlsx")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("verified-publications-2026-Q1.xlsx", response.headers["content-disposition"])
+        with zipfile.ZipFile(BytesIO(response.content)) as workbook:
+            strings = workbook.read("xl/sharedStrings.xml").decode()
+            sheet = workbook.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("=HYPERLINK(1)", strings)
+        self.assertNotIn("<f>", sheet)  # stored as text, never as a formula
+
+    def test_pdf_export(self):
+        with Session(self.engine) as db:
+            risky = _pub("98", "2026 Mar 3")
+            risky.title = "<img src='http://example.invalid/x'> & co"
+            db.add(risky)
+            db.commit()
+        response = self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=pdf")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_export_with_no_results(self):
+        for fmt in ("xlsx", "pdf"):
+            self.assertEqual(self.client.get(f"/reports/quarterly/export?year=1999&quarter=1&format={fmt}").status_code, 200)
+
+    def test_invalid_export_format_rejected(self):
+        self.assertEqual(self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=doc").status_code, 422)
+
     def test_invalid_quarter_rejected(self):
         self.assertEqual(self.client.get("/reports/quarterly?year=2026&quarter=5").status_code, 422)
+
+
+class CitationTests(unittest.TestCase):
+    def test_nlm_citation(self):
+        p = Publication(pmid="123", title="Stem cell repair", authors=["Lee AB", "Garcia J", "Study Group"],
+                        journal="Journal X", doi="10.1234/test", publication_year=2026, publication_month=10)
+        citation = format_citations([p])["123"]
+        self.assertTrue(citation.startswith("Lee AB, Garcia J"), citation)
+        self.assertIn("Stem cell repair", citation)
+        self.assertIn("10.1234/test", citation)
+        self.assertIn("2026 Oct.", citation)
+
+    def test_sparse_publication(self):
+        p = Publication(pmid="7", title="Only a title", authors=[])
+        self.assertIn("Only a title", format_citations([p])["7"])
