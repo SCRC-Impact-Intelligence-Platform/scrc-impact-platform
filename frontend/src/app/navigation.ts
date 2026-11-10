@@ -3,6 +3,7 @@ import {
   ClipboardList,
   Database,
   FileCheck2,
+  FileText,
   LayoutDashboard,
   Settings2,
   Users,
@@ -54,6 +55,12 @@ export const navigation: NavigationItem[] = [
     label: 'Attributions',
     description: 'Confirmed publication-resource relationships',
     icon: FileCheck2,
+  },
+  {
+    path: '/reports',
+    label: 'Reports',
+    description: 'Quarterly verified-publication reports',
+    icon: FileText,
   },
   {
     path: '/settings',
