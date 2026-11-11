@@ -123,3 +123,15 @@ mapping, sync validation rules, and local database reset implications.
 
 For SMTP setup and local email testing, see
 [EMAIL_WORKFLOW.md](EMAIL_WORKFLOW.md#smtp-configuration-local-development).
+
+## Import Researchers (CSV)
+
+On the Researchers page, upload a UTF-8 CSV with columns `name,email,orcid`.
+Email is required; ORCID is optional (`N/A` or blank).
+
+- Existing email → skip.
+- New email → create researcher.
+
+Example: [researchers.csv](examples/researchers.csv)
+
+API: `POST /researchers/import`.

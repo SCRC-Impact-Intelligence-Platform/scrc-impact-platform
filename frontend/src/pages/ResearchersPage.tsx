@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { PageHeader } from '../components/common/PageHeader'
 import { researchersApi, type Researcher } from '../features/directory/api'
 import {
@@ -23,6 +23,18 @@ export default function ResearchersPage() {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [deleting, setDeleting] = useState<Researcher | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const bulkImport = useMutation({
+    mutationFn: async (file: File) => researchersApi.importCsv(await file.text()),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: key })
+      setImportMessage(`Imported: ${result.created} new, ${result.skipped} skipped.`)
+      setImportFile(null)
+      setError(null)
+    },
+    onError: (reason: Error) => setError(reason.message),
+  })
   const save = useMutation({
     mutationFn: (value: Draft) =>
       editing
@@ -86,6 +98,43 @@ export default function ResearchersPage() {
           </button>
         }
       />
+      <div className="panel space-y-3 p-5">
+        <h2 className="font-semibold text-slate-900">Import researchers from CSV</h2>
+        <p className="text-sm text-slate-600">
+          Columns: name, email, orcid. Email is required; ORCID is optional. Existing emails are
+          skipped without changes; new emails are added.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            aria-label="Researcher CSV file"
+            type="file"
+            accept=".csv,text/csv"
+            className="text-sm"
+            onChange={(e) => {
+              setImportFile(e.target.files?.[0] ?? null)
+              setImportMessage(null)
+              setError(null)
+            }}
+          />
+          <button
+            type="button"
+            className={secondaryButton}
+            disabled={!importFile || bulkImport.isPending}
+            onClick={() => {
+              if (importFile) bulkImport.mutate(importFile)
+            }}
+          >
+            <Upload size={15} className="mr-2 inline" />
+            {bulkImport.isPending ? 'Importing…' : 'Import CSV'}
+          </button>
+        </div>
+        {importMessage && (
+          <p role="status" className="text-sm text-emerald-700">
+            {importMessage}
+          </p>
+        )}
+        <Feedback message={error} />
+      </div>
       <div className="panel overflow-hidden">
         {query.isPending ? (
           <p className="p-6 text-sm text-slate-500">Loading researchers…</p>
