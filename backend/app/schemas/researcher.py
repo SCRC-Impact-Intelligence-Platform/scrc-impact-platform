@@ -30,3 +30,8 @@ class ResearcherResponse(BaseModel):
     orcid: str | None
     email: EmailStr
     is_active: bool
+
+
+class ResearcherImportResponse(BaseModel):
+    created: int
+    skipped: int

@@ -7,6 +7,7 @@ export type Researcher = {
   email: string
   is_active: boolean
 }
+export type ResearcherImportResult = { created: number; skipped: number }
 export type ResourceType = 'EQUIPMENT' | 'FUNDING' | 'SERVICE'
 export type Resource = { id: number; name: string; type: ResourceType; is_active: boolean }
 export type ResearcherCreate = { name: string; orcid: string | null; email: string }
@@ -24,6 +25,12 @@ const mutation = <T>(method: string, path: string, body?: object) =>
 
 export const researchersApi = {
   list: () => apiRequest<Researcher[]>('/researchers'),
+  importCsv: (csv: string) =>
+    apiRequest<ResearcherImportResult>('/researchers/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/csv' },
+      body: csv,
+    }),
   create: (payload: ResearcherCreate) => mutation<Researcher>('POST', '/researchers', payload),
   update: (id: number, payload: ResearcherUpdate) =>
     mutation<Researcher>('PATCH', `/researchers/${id}`, payload),
