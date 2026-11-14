@@ -1,5 +1,23 @@
 import { apiRequest, BASE } from '../../app/api'
-import type { Publication } from '../publications/api'
+import type { ResourceType } from '../directory/api'
+import type { Publication, ResourceAttribution } from '../publications/api'
+
+export type ReportResourceAttribution = ResourceAttribution & { resource_type: ResourceType }
+
+export type AttributedPublication = {
+  publication: Publication
+  resources: ReportResourceAttribution[]
+}
+
+export type AttributionSummary = {
+  /** Publications in the quarter attributed to at least one resource. */
+  attributed_in_period: number
+  /** ...of which at least one attributed resource is a grant (FUNDING). */
+  grant_attributed_in_period: number
+  /** All verified attributed publications, whatever their date. */
+  attributed_total: number
+  grant_attributed_total: number
+}
 
 export type QuarterlyReport = {
   year: number
@@ -9,6 +27,9 @@ export type QuarterlyReport = {
   undated_publications: Publication[]
   /** Verified publications with no readable year; not in any report period. */
   no_date_publications: Publication[]
+  /** The quarter's publications that have resource attributions, in the same order. */
+  attributed_publications: AttributedPublication[]
+  attribution_summary: AttributionSummary
 }
 
 export type ReportingPeriod = { year: number; quarter: number }

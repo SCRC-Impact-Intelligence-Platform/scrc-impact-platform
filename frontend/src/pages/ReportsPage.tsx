@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, FileText } from 'lucide-react'
 import { PageHeader } from '../components/common/PageHeader'
+import type { Criticality } from '../features/attributions/api'
 import { Feedback, primaryButton, secondaryButton } from '../features/directory/DirectoryUI'
 import { researcherName, researchersApi } from '../features/directory/api'
 import { pubmedUrl, type Publication } from '../features/publications/api'
 import {
+  type AttributedPublication,
+  type QuarterlyReport,
   periodLabel,
   recentPeriods,
   reportExportUrl,
@@ -32,6 +35,66 @@ function ExcludedNote({ publications, reason }: { publications: Publication[]; r
         ))}
       </ul>
     </details>
+  )
+}
+
+function SummaryStats({ report }: { report: QuarterlyReport }) {
+  const s = report.attribution_summary
+  const stats = [
+    ['Verified this quarter', report.publications.length],
+    ['Attributed this quarter', s.attributed_in_period],
+    ['Attributed to grants this quarter', s.grant_attributed_in_period],
+    ['Attributed, all time', s.attributed_total],
+    ['Attributed to grants, all time', s.grant_attributed_total],
+  ] as const
+  return (
+    <dl className="grid grid-cols-2 gap-px border-b border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-5">
+      {stats.map(([label, value]) => (
+        <div key={label} className="bg-white px-5 py-3">
+          <dt className="text-xs text-slate-500">{label}</dt>
+          <dd className="text-xl font-bold text-slate-900">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+const criticalityLabel = (c: Criticality) => c.charAt(0) + c.slice(1).toLowerCase()
+
+function AttributedList({ items }: { items: AttributedPublication[] }) {
+  return (
+    <div className="border-b border-slate-200">
+      <h3 className="px-5 pt-4 text-sm font-semibold text-slate-900">
+        Attributed publications ({items.length})
+      </h3>
+      {items.length === 0 ? (
+        <p className="px-5 py-3 text-sm text-slate-500">
+          No attributed publications in this period.
+        </p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {items.map(({ publication: p, resources }) => (
+            <li key={p.id} className="px-5 py-3 text-sm">
+              <p className="font-medium text-slate-900">{p.title}</p>
+              <p className="mt-1 flex flex-wrap gap-1.5">
+                {resources.map((r) => (
+                  <span
+                    key={r.resource_id}
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      r.resource_type === 'FUNDING'
+                        ? 'bg-emerald-50 text-emerald-800'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {r.resource_name} · {criticalityLabel(r.criticality)}
+                  </span>
+                ))}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -110,6 +173,11 @@ export default function ReportsPage() {
           </div>
           {report.data && (
             <>
+              <SummaryStats report={report.data} />
+              <AttributedList items={report.data.attributed_publications} />
+              <h3 className="px-5 pt-4 text-sm font-semibold text-slate-900">
+                All verified publications
+              </h3>
               <ExcludedNote
                 publications={report.data.undated_publications}
                 reason={`from ${report.data.year} with no month in the PubMed date couldn't be placed in a quarter.`}

@@ -1,18 +1,21 @@
 """Quarterly report: CONFIRMED publications whose stored date falls in the quarter."""
 
+import re
 import unittest
 import zipfile
 from io import BytesIO
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api.reports import router
 from app.database import Base, get_db
 from app.models.publication import Publication
+from app.models.publication_resource import PublicationResource
+from app.models.resource import Resource
 from app.services.citations import format_citations
 from app.services.pubdates import date_parts, parse_date
 
@@ -85,6 +88,20 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
                 _pub("12", "Winter 2025-2026"),
                 _pub("13", None, status="PENDING"),
             ])
+            db.add_all([
+                Resource(id=1, name="Flow Cytometer", type="EQUIPMENT"),
+                Resource(id=2, name="CIRM Grant", type="FUNDING"),
+            ])
+            db.flush()
+            ids = {p.pmid: p.id for p in db.scalars(select(Publication))}
+            db.add_all([
+                PublicationResource(publication_id=ids["1"], resource_id=1, criticality="CRITICAL"),
+                PublicationResource(publication_id=ids["1"], resource_id=2, criticality="MINOR"),
+                PublicationResource(publication_id=ids["9"], resource_id=1, criticality="SIGNIFICANT"),
+                PublicationResource(publication_id=ids["4"], resource_id=2, criticality="CRITICAL"),  # Q2
+                PublicationResource(publication_id=ids["6"], resource_id=2, criticality="MINOR"),  # no month
+                PublicationResource(publication_id=ids["3"], resource_id=2, criticality="MINOR"),  # not CONFIRMED
+            ])
             db.commit()
         app = FastAPI()
         app.include_router(router)
@@ -113,6 +130,29 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
         self.assertEqual([p["pmid"] for p in body["undated_publications"]], ["6"])
         self.assertEqual([p["pmid"] for p in body["no_date_publications"]], ["11", "12"])
 
+    def test_attributed_publications_and_summary(self):
+        body = self.report(2026, 1)
+        attributed = body["attributed_publications"]
+        # Same order as the quarter's list; unattributed publications left out.
+        self.assertEqual([a["publication"]["pmid"] for a in attributed], ["1", "9"])
+        self.assertEqual(
+            [(r["resource_name"], r["resource_type"], r["criticality"]) for r in attributed[0]["resources"]],
+            [("CIRM Grant", "FUNDING", "MINOR"), ("Flow Cytometer", "EQUIPMENT", "CRITICAL")],
+        )
+        self.assertEqual(body["attribution_summary"], {
+            "attributed_in_period": 2,
+            "grant_attributed_in_period": 1,
+            # All CONFIRMED attributed publications, any date; PENDING "3" excluded.
+            "attributed_total": 4,
+            "grant_attributed_total": 3,
+        })
+
+    def test_summary_with_no_attributions_in_period(self):
+        body = self.report(2025, 4)
+        self.assertEqual(body["attributed_publications"], [])
+        self.assertEqual(body["attribution_summary"]["attributed_in_period"], 0)
+        self.assertEqual(body["attribution_summary"]["attributed_total"], 4)
+
     def test_range_counts_in_starting_quarter(self):
         self.assertEqual([p["pmid"] for p in self.report(2025, 4)["publications"]], ["10"])
 
@@ -127,9 +167,16 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
         self.assertIn("verified-publications-2026-Q1.xlsx", response.headers["content-disposition"])
         with zipfile.ZipFile(BytesIO(response.content)) as workbook:
             strings = workbook.read("xl/sharedStrings.xml").decode()
-            sheet = workbook.read("xl/worksheets/sheet1.xml").decode()
+            sheets = [workbook.read(name).decode() for name in workbook.namelist()
+                      if name.startswith("xl/worksheets/sheet")]
+            workbook_xml = workbook.read("xl/workbook.xml").decode()
+        # Data only: the publication list stays the first sheet; summary counts are in the PDF.
+        names = re.findall(r'<sheet name="([^"]+)"', workbook_xml)
+        self.assertEqual(names, ["Publications", "Attributed publications", "Not in a quarter"])
         self.assertIn("=HYPERLINK(1)", strings)
-        self.assertNotIn("<f>", sheet)  # stored as text, never as a formula
+        self.assertIn("Flow Cytometer (Critical)", strings)
+        for sheet in sheets:
+            self.assertNotIn("<f>", sheet)  # stored as text, never as a formula
 
     def test_pdf_export(self):
         with Session(self.engine) as db:
