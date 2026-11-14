@@ -153,6 +153,37 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
         self.assertEqual(body["attribution_summary"]["attributed_in_period"], 0)
         self.assertEqual(body["attribution_summary"]["attributed_total"], 4)
 
+    def test_resource_filter(self):
+        body = self.client.get("/reports/quarterly?year=2026&quarter=1&resource_id=2").json()
+        self.assertEqual((body["resource_id"], body["resource_name"]), (2, "CIRM Grant"))
+        self.assertEqual([p["pmid"] for p in body["publications"]], ["1"])
+        self.assertEqual([p["pmid"] for p in body["undated_publications"]], ["6"])
+        self.assertEqual(body["no_date_publications"], [])
+        # A publication keeps all its resources, not just the filtered one.
+        self.assertEqual(len(body["attributed_publications"][0]["resources"]), 2)
+        self.assertEqual(body["attribution_summary"], {
+            "attributed_in_period": 1, "grant_attributed_in_period": 1,
+            "attributed_total": 3, "grant_attributed_total": 3,  # "1", "4", "6"; PENDING "3" excluded
+        })
+        equipment = self.client.get("/reports/quarterly?year=2026&quarter=1&resource_id=1").json()
+        self.assertEqual([p["pmid"] for p in equipment["publications"]], ["1", "9"])
+        # "1" is also attributed to the grant, so it counts as grant-attributed.
+        self.assertEqual(equipment["attribution_summary"]["grant_attributed_total"], 1)
+
+    def test_unknown_resource_404(self):
+        self.assertEqual(self.client.get("/reports/quarterly?year=2026&quarter=1&resource_id=999").status_code, 404)
+        self.assertEqual(
+            self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=pdf&resource_id=999").status_code, 404
+        )
+
+    def test_report_type(self):
+        for report_type in ("LEADERSHIP", "NIH", "CIRM", "ADVANCEMENT"):
+            url = f"/reports/quarterly/export?year=2026&quarter=1&format=pdf&report_type={report_type}&resource_id=1"
+            self.assertEqual(self.client.get(url).status_code, 200, report_type)
+        self.assertEqual(
+            self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=pdf&report_type=OTHER").status_code, 422
+        )
+
     def test_range_counts_in_starting_quarter(self):
         self.assertEqual([p["pmid"] for p in self.report(2025, 4)["publications"]], ["10"])
 

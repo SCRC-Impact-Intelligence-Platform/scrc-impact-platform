@@ -5,6 +5,7 @@ from io import BytesIO
 
 import xlsxwriter
 
+from app.enums import ReportType
 from app.models.publication import Publication
 from app.services.citations import format_citations
 from app.services.quarterly_report import is_grant
@@ -90,11 +91,22 @@ def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
     return output.getvalue()
 
 
-def build_pdf(report: dict) -> bytes:
+REPORT_TITLES = {
+    ReportType.LEADERSHIP: "Leadership report",
+    ReportType.NIH: "NIH report",
+    ReportType.CIRM: "CIRM report",
+    ReportType.ADVANCEMENT: "Advancement report",
+}
+
+
+def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> bytes:
     # Imported here because WeasyPrint needs the Pango system libraries at import time.
     from weasyprint import HTML
 
     label = escape(period_label(report["year"], report["quarter"]))
+    if report["resource_name"]:
+        label += f" &middot; Resource: {escape(report['resource_name'])}"
+    title = escape(REPORT_TITLES[report_type])
     citations = format_citations(report["publications"])
     items = "".join(f"<li>{escape(citations[p.pmid])}</li>" for p in report["publications"])
     notes = "".join(
@@ -123,7 +135,7 @@ def build_pdf(report: dict) -> bytes:
       td {{ padding: 2pt 14pt 2pt 0; }} td.n {{ text-align: right; font-weight: bold; }}
       .res {{ color: #444; font-size: 9.5pt; margin-top: 2pt; }}
     </style>
-    <h1>Publication impact report</h1><p class="sub">{label}</p>
+    <h1>{title}</h1><p class="sub">{label}</p>
     <h2>Summary</h2><table>{summary}</table>
     <h2>Attributed publications</h2>{attributed}
     <h2>Verified publications</h2><p class="sub">{count} publication(s)</p>

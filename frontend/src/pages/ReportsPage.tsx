@@ -3,16 +3,24 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, FileText } from 'lucide-react'
 import { PageHeader } from '../components/common/PageHeader'
 import type { Criticality } from '../features/attributions/api'
-import { Feedback, primaryButton, secondaryButton } from '../features/directory/DirectoryUI'
-import { researcherName, researchersApi } from '../features/directory/api'
+import {
+  Feedback,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+} from '../features/directory/DirectoryUI'
+import { researcherName, researchersApi, resourcesApi } from '../features/directory/api'
 import { pubmedUrl, type Publication } from '../features/publications/api'
 import {
   type AttributedPublication,
   type QuarterlyReport,
   periodLabel,
   recentPeriods,
+  REPORT_TYPES,
   reportExportUrl,
   reportsApi,
+  type ReportParams,
+  type ReportType,
   type ReportingPeriod,
 } from '../features/reports/api'
 
@@ -98,43 +106,80 @@ function AttributedList({ items }: { items: AttributedPublication[] }) {
   )
 }
 
+const fieldLabel = 'block space-y-1.5 text-sm font-semibold text-slate-800'
+const selectClass = `${inputClass} font-normal`
+const exportButton =
+  'inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50'
+
 export default function ReportsPage() {
   // Recomputed each render so a tab left open across a quarter boundary picks up the new quarter.
   const periods = recentPeriods(PERIOD_COUNT)
-  const [chosen, setChosen] = useState(keyOf(periods[0]))
+  const [chosenPeriod, setChosenPeriod] = useState(keyOf(periods[0]))
   // If the chosen period rolled off the list, fall back to the newest one.
-  const selected = periods.some((p) => keyOf(p) === chosen) ? chosen : keyOf(periods[0])
+  const periodKey = periods.some((p) => keyOf(p) === chosenPeriod)
+    ? chosenPeriod
+    : keyOf(periods[0])
+  const [reportType, setReportType] = useState<ReportType>('LEADERSHIP')
+  const [resourceId, setResourceId] = useState<number | null>(null)
+  const params: ReportParams = {
+    reportType,
+    period: periods.find((p) => keyOf(p) === periodKey)!,
+    resourceId,
+  }
+
   // The report only runs when "Generate Report" is pressed, not on every select change.
-  const [generated, setGenerated] = useState<ReportingPeriod | null>(null)
+  const [generated, setGenerated] = useState<ReportParams | null>(null)
   const report = useQuery({
-    queryKey: ['reports', 'quarterly', generated],
+    queryKey: ['reports', 'quarterly', generated?.period, generated?.resourceId],
     queryFn: () => reportsApi.quarterly(generated!),
     enabled: generated !== null,
   })
   const researchers = useQuery({ queryKey: ['researchers'], queryFn: researchersApi.list })
+  const resources = useQuery({ queryKey: ['resources'], queryFn: resourcesApi.list })
   const nameFor = (id: number | null) => researcherName(researchers.data, id)
+  const sortedResources = [...(resources.data ?? [])].sort((a, b) => a.name.localeCompare(b.name))
+  const typeLabel = (type: ReportType) => REPORT_TYPES.find((t) => t.value === type)!.label
 
   return (
     <section className="space-y-6">
       <PageHeader
         title="Report Builder"
-        description="Generate a list of verified publications for a reporting period."
+        description="Generate reports for leadership, NIH, CIRM, or advancement."
       />
       <form
-        className="panel flex flex-wrap items-end gap-4 p-5"
+        className="panel max-w-md space-y-4 p-6"
         onSubmit={(event) => {
           event.preventDefault()
-          // Same period again: refetch so newly verified publications show up.
-          if (generated && keyOf(generated) === selected) void report.refetch()
-          else setGenerated(periods.find((p) => keyOf(p) === selected)!)
+          const same =
+            generated &&
+            keyOf(generated.period) === periodKey &&
+            generated.resourceId === resourceId
+          // Same filters again: refetch so newly verified publications show up.
+          if (same) void report.refetch()
+          setGenerated(params)
         }}
       >
-        <label className="space-y-1 text-sm font-medium text-slate-700">
-          <span className="block">Reporting period</span>
+        <h2 className="text-xl font-bold text-[#102c49]">Report Builder</h2>
+        <label className={fieldLabel}>
+          <span className="block">Report Type</span>
           <select
-            className="min-w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            value={selected}
-            onChange={(e) => setChosen(e.target.value)}
+            className={selectClass}
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value as ReportType)}
+          >
+            {REPORT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={fieldLabel}>
+          <span className="block">Reporting Period</span>
+          <select
+            className={selectClass}
+            value={periodKey}
+            onChange={(e) => setChosenPeriod(e.target.value)}
           >
             {periods.map((p) => (
               <option key={keyOf(p)} value={keyOf(p)}>
@@ -143,33 +188,59 @@ export default function ReportsPage() {
             ))}
           </select>
         </label>
-        <button type="submit" className={primaryButton} disabled={report.isFetching}>
-          Generate Report
-        </button>
+        <label className={fieldLabel}>
+          <span className="block">Department</span>
+          {/* Researchers have no department yet, so there is nothing to filter by. */}
+          <select className={selectClass} defaultValue="">
+            <option value="">All Departments</option>
+          </select>
+        </label>
+        <label className={fieldLabel}>
+          <span className="block">Resource</span>
+          <select
+            className={selectClass}
+            value={resourceId ?? ''}
+            onChange={(e) => setResourceId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">All Resources</option>
+            {sortedResources.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+                {r.is_active ? '' : ' (inactive)'}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button type="submit" className={primaryButton} disabled={report.isFetching}>
+            Generate Report
+          </button>
+          <a className={exportButton} href={reportExportUrl(params, 'pdf')} download>
+            Export PDF
+          </a>
+          <a className={exportButton} href={reportExportUrl(params, 'xlsx')} download>
+            Export Excel
+          </a>
+        </div>
+        <p className="border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-600">
+          Verified publications are included in all report exports and can be filtered by period,
+          department, or resource.
+        </p>
       </form>
 
       {generated && (
         <div className="panel overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-5">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Verified publications · {periodLabel(generated)}
-              </h2>
-              {report.data && (
-                <p className="muted mt-1 text-sm">
-                  {report.data.publications.length} publication
-                  {report.data.publications.length === 1 ? '' : 's'}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <a className={secondaryButton} href={reportExportUrl(generated, 'pdf')} download>
-                Export PDF
-              </a>
-              <a className={secondaryButton} href={reportExportUrl(generated, 'xlsx')} download>
-                Export Excel
-              </a>
-            </div>
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-lg font-bold text-slate-900">
+              {typeLabel(generated.reportType)} report · {periodLabel(generated.period)}
+            </h2>
+            {report.data && (
+              <p className="muted mt-1 text-sm">
+                {report.data.resource_name && <>Resource: {report.data.resource_name} · </>}
+                {report.data.publications.length} verified publication
+                {report.data.publications.length === 1 ? '' : 's'}
+              </p>
+            )}
           </div>
           {report.data && (
             <>

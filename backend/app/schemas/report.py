@@ -29,6 +29,9 @@ class AttributionSummary(BaseModel):
 class QuarterlyReportResponse(BaseModel):
     year: int
     quarter: int
+    # The resource filter, when one was applied.
+    resource_id: int | None
+    resource_name: str | None
     publications: list[PublicationResponse]
     # CONFIRMED publications from the year whose date has no month; not in any quarter.
     undated_publications: list[PublicationResponse]

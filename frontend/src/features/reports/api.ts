@@ -22,6 +22,9 @@ export type AttributionSummary = {
 export type QuarterlyReport = {
   year: number
   quarter: number
+  /** The resource filter, when one was applied. */
+  resource_id: number | null
+  resource_name: string | null
   publications: Publication[]
   /** Verified publications from the year whose date has no month; not in any quarter. */
   undated_publications: Publication[]
@@ -54,11 +57,37 @@ export function recentPeriods(count: number, today = new Date()): ReportingPerio
   return periods
 }
 
+export type ReportType = 'LEADERSHIP' | 'NIH' | 'CIRM' | 'ADVANCEMENT'
+
+export const REPORT_TYPES: { value: ReportType; label: string }[] = [
+  { value: 'LEADERSHIP', label: 'Leadership' },
+  { value: 'NIH', label: 'NIH' },
+  { value: 'CIRM', label: 'CIRM' },
+  { value: 'ADVANCEMENT', label: 'Advancement' },
+]
+
+/** Everything chosen in the Report Builder form. */
+export type ReportParams = {
+  reportType: ReportType
+  period: ReportingPeriod
+  resourceId: number | null
+}
+
+const reportQuery = ({ period, resourceId }: ReportParams) => {
+  const query = new URLSearchParams({ year: String(period.year), quarter: String(period.quarter) })
+  if (resourceId !== null) query.set('resource_id', String(resourceId))
+  return query
+}
+
 /** Same-origin link to the report's Excel or PDF download. */
-export const reportExportUrl = ({ year, quarter }: ReportingPeriod, format: 'xlsx' | 'pdf') =>
-  `${BASE}/reports/quarterly/export?year=${year}&quarter=${quarter}&format=${format}`
+export const reportExportUrl = (params: ReportParams, format: 'xlsx' | 'pdf') => {
+  const query = reportQuery(params)
+  query.set('format', format)
+  query.set('report_type', params.reportType)
+  return `${BASE}/reports/quarterly/export?${query}`
+}
 
 export const reportsApi = {
-  quarterly: ({ year, quarter }: ReportingPeriod) =>
-    apiRequest<QuarterlyReport>(`/reports/quarterly?year=${year}&quarter=${quarter}`),
+  quarterly: (params: ReportParams) =>
+    apiRequest<QuarterlyReport>(`/reports/quarterly?${reportQuery(params)}`),
 }

@@ -10,7 +10,7 @@ from app.models.researcher import Researcher
 from app.models.resource import Resource
 
 
-def quarterly_report_data(db: Session, year: int, quarter: int) -> dict:
+def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resource | None = None) -> dict:
     """Verified (CONFIRMED) publications whose PubMed date falls in a calendar quarter.
 
     Uses the stored date parts (a date range counts in the quarter it starts in).
@@ -18,9 +18,13 @@ def quarterly_report_data(db: Session, year: int, quarter: int) -> dict:
     placed in a quarter; they are returned separately as ``undated_publications``.
     Publications with no readable year at all belong to no year, so they are
     returned as ``no_date_publications`` on every report.
+
+    With a ``resource``, every list and count only covers publications attributed to it.
     """
     P = Publication
     confirmed = select(P).where(P.status == PublicationStatus.CONFIRMED)
+    if resource is not None:
+        confirmed = confirmed.where(P.id.in_(_attributed_to(resource)))
     confirmed_in_year = confirmed.where(P.publication_year == year)
     first_month = (quarter - 1) * 3 + 1
     in_quarter = confirmed_in_year.where(P.publication_month.between(first_month, first_month + 2))
@@ -34,10 +38,12 @@ def quarterly_report_data(db: Session, year: int, quarter: int) -> dict:
     # A subquery, not a literal id list: SQL Server allows at most 2100 bound parameters.
     resources = _attributions(db, in_quarter.with_only_columns(P.id))
     attributed = [p for p in publications if p.id in resources]
-    attributed_total, grant_attributed_total = _attributed_counts(db)
+    attributed_total, grant_attributed_total = _attributed_counts(db, resource)
     return {
         "year": year,
         "quarter": quarter,
+        "resource_id": resource.id if resource else None,
+        "resource_name": resource.name if resource else None,
         "publications": publications,
         "undated_publications": undated,
         "no_date_publications": no_date,
@@ -76,10 +82,17 @@ def _attributions(db: Session, publication_ids: Select) -> dict[int, list[dict]]
     return result
 
 
-def _attributed_counts(db: Session) -> tuple[int, int]:
-    """All-time CONFIRMED publications attributed to any resource, and to a grant (FUNDING)."""
+def _attributed_to(resource: Resource) -> Select:
+    return select(PublicationResource.publication_id).where(PublicationResource.resource_id == resource.id)
+
+
+def _attributed_counts(db: Session, resource: Resource | None = None) -> tuple[int, int]:
+    """All-time CONFIRMED publications attributed to any resource, and to a grant (FUNDING).
+
+    With a ``resource``, only publications attributed to that resource are counted.
+    """
     publication_id = PublicationResource.publication_id
-    total, grants = db.execute(
+    query = (
         select(
             func.count(func.distinct(publication_id)),
             func.count(func.distinct(case((Resource.type == ResourceType.FUNDING.value, publication_id)))),
@@ -88,7 +101,10 @@ def _attributed_counts(db: Session) -> tuple[int, int]:
         .join(Resource, Resource.id == PublicationResource.resource_id)
         .join(Publication, Publication.id == publication_id)
         .where(Publication.status == PublicationStatus.CONFIRMED)
-    ).one()
+    )
+    if resource is not None:
+        query = query.where(Publication.id.in_(_attributed_to(resource)))
+    total, grants = db.execute(query).one()
     return total, grants
 
 
