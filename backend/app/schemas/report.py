@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from app.enums import ResourceCriticality, ResourceType
+from app.schemas.grant import GrantResponse
 from app.schemas.publication import PublicationResponse
 
 
@@ -26,6 +27,10 @@ class AttributionSummary(BaseModel):
     grant_attributed_total: int
 
 
+class ReportGrant(GrantResponse):
+    researcher_name: str | None
+
+
 class QuarterlyReportResponse(BaseModel):
     year: int
     quarter: int
@@ -40,3 +45,5 @@ class QuarterlyReportResponse(BaseModel):
     # The quarter's publications that have resource attributions, in the same order.
     attributed_publications: list[AttributedPublication]
     attribution_summary: AttributionSummary
+    # Grants with an award date in the quarter; not affected by the resource filter.
+    grants_received: list[ReportGrant]

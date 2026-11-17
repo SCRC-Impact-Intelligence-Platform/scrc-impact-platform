@@ -14,6 +14,8 @@ _COLUMNS = (("#", 5), ("Title", 60), ("Authors", 40), ("Journal", 30), ("Date", 
             ("Researcher", 24), ("PMID", 12), ("DOI", 28), ("Citation", 80))
 
 
+_GRANT_COLUMNS = (("Award date", 12), ("Title", 60), ("Funder", 30), ("Amount (USD)", 16), ("Researcher", 24))
+
 _EXCLUDED_COLUMNS = (("Reason", 45), ("Title", 60), ("Date", 18), ("PMID", 12))
 
 _ATTRIBUTED_COLUMNS = (("#", 5), ("Title", 60), ("Date", 14), ("PMID", 12),
@@ -53,6 +55,18 @@ def resource_label(resource: dict) -> str:
     return f"{resource['resource_name']} ({resource['criticality'].title()})"
 
 
+def grant_line(grant: dict) -> str:
+    """One line per grant: title, funder, then amount, award date and researcher when known."""
+    parts = [f"{grant['title']} ({grant['funder']})"]
+    if grant["amount"] is not None:
+        parts.append(f"${grant['amount']:,.2f}")
+    awarded = grant["award_date"]
+    parts.append(f"awarded {awarded:%b} {awarded.day}, {awarded.year}")
+    if grant["researcher_name"]:
+        parts.append(grant["researcher_name"])
+    return " · ".join(parts)
+
+
 def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
     citations = format_citations(report["publications"])
     output = BytesIO()
@@ -88,6 +102,16 @@ def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
                 for column, value in enumerate((reason, p.title, p.publication_date or "", p.pmid)):
                     excluded.write_string(row, column, value)
                 row += 1
+        if report["grants_received"]:
+            grants = workbook.add_worksheet("Grants received")
+            _write_header(grants, _GRANT_COLUMNS, bold, wrap)
+            money = workbook.add_format({"num_format": "#,##0.00", "valign": "top"})
+            for row, g in enumerate(report["grants_received"], start=1):
+                for column, value in enumerate((g["award_date"].isoformat(), g["title"], g["funder"])):
+                    grants.write_string(row, column, value)
+                if g["amount"] is not None:
+                    grants.write_number(row, 3, float(g["amount"]), money)
+                grants.write_string(row, 4, g["researcher_name"] or "")
     return output.getvalue()
 
 
@@ -123,6 +147,10 @@ def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> 
     )
     attributed = (f"<ol>{attributed_items}</ol>" if attributed_items
                   else "<p class='note'>No attributed publications in this period.</p>")
+    grants = ""
+    if report["grants_received"]:
+        grant_items = "".join(f"<li>{escape(grant_line(g))}</li>" for g in report["grants_received"])
+        grants = f"<h2>Grants received</h2><ol>{grant_items}</ol>"
     html = f"""<!doctype html><meta charset="utf-8"><style>
       @page {{ size: letter; margin: 0.75in; }}
       body {{ font-family: sans-serif; font-size: 10.5pt; line-height: 1.4; }}
@@ -137,6 +165,7 @@ def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> 
     </style>
     <h1>{title}</h1><p class="sub">{label}</p>
     <h2>Summary</h2><table>{summary}</table>
+    {grants}
     <h2>Attributed publications</h2>{attributed}
     <h2>Verified publications</h2><p class="sub">{count} publication(s)</p>
     {notes}<ol>{items}</ol>"""

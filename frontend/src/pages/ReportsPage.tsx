@@ -19,6 +19,7 @@ import {
   REPORT_TYPES,
   reportExportUrl,
   reportsApi,
+  type ReportGrant,
   type ReportParams,
   type ReportType,
   type ReportingPeriod,
@@ -64,6 +65,41 @@ function SummaryStats({ report }: { report: QuarterlyReport }) {
         </div>
       ))}
     </dl>
+  )
+}
+
+const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+// Parsed as a local date: new Date('2026-10-01') would be UTC midnight, the day before in California.
+const awardDate = (iso: string) => {
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { dateStyle: 'medium' })
+}
+
+function GrantsReceived({ grants }: { grants: ReportGrant[] }) {
+  if (grants.length === 0) return null
+  return (
+    <div className="border-b border-slate-200">
+      <h3 className="px-5 pt-4 text-sm font-semibold text-slate-900">
+        Grants received ({grants.length})
+      </h3>
+      <ul className="divide-y divide-slate-100">
+        {grants.map((g) => (
+          <li key={g.id} className="px-5 py-3 text-sm">
+            <p className="font-medium text-slate-900">{g.title}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {[
+                g.funder,
+                g.amount !== null && usd.format(Number(g.amount)),
+                `Awarded ${awardDate(g.award_date)}`,
+                g.researcher_name,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -245,6 +281,7 @@ export default function ReportsPage() {
           {report.data && (
             <>
               <SummaryStats report={report.data} />
+              <GrantsReceived grants={report.data.grants_received} />
               <AttributedList items={report.data.attributed_publications} />
               <h3 className="px-5 pt-4 text-sm font-semibold text-slate-900">
                 All verified publications

@@ -19,6 +19,8 @@ from app.api.publications import router as publications_router
 from app.api.forms import router as forms_router
 from app.api.attributions import router as attributions_router
 from app.api.reports import router as reports_router
+from app.api.grants import router as grants_router
+from app.models.grant import Grant  # noqa: F401
 from app.models.forms import FormBatch, FormQuestion, SyncedFormResponse
 from app.models.publication_resource import PublicationResource  # noqa: F401
 
@@ -41,6 +43,7 @@ app.include_router(publications_router)
 app.include_router(forms_router)
 app.include_router(attributions_router)
 app.include_router(reports_router)
+app.include_router(grants_router)
 
 
 @app.get("/")

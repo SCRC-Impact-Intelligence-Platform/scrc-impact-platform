@@ -1,9 +1,12 @@
 """Assembles the data behind the quarterly report and its exports."""
 
+from datetime import date
+
 from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
 from app.enums import PublicationStatus, ResourceType
+from app.models.grant import Grant
 from app.models.publication import Publication
 from app.models.publication_resource import PublicationResource
 from app.models.researcher import Researcher
@@ -19,7 +22,8 @@ def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resour
     Publications with no readable year at all belong to no year, so they are
     returned as ``no_date_publications`` on every report.
 
-    With a ``resource``, every list and count only covers publications attributed to it.
+    With a ``resource``, every publication list and count only covers publications
+    attributed to it. ``grants_received`` (awarded in the quarter) is never filtered.
     """
     P = Publication
     confirmed = select(P).where(P.status == PublicationStatus.CONFIRMED)
@@ -50,6 +54,7 @@ def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resour
         "attributed_publications": [
             {"publication": p, "resources": resources[p.id]} for p in attributed
         ],
+        "grants_received": _grants_received(db, year, quarter),
         "attribution_summary": {
             "attributed_in_period": len(attributed),
             "grant_attributed_in_period": sum(1 for p in attributed if any(map(is_grant, resources[p.id]))),
@@ -57,6 +62,23 @@ def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resour
             "grant_attributed_total": grant_attributed_total,
         },
     }
+
+
+def _grants_received(db: Session, year: int, quarter: int) -> list[dict]:
+    """Grants with an award date in the quarter, oldest first, with the researcher's name."""
+    start = date(year, (quarter - 1) * 3 + 1, 1)
+    end = date(year + 1, 1, 1) if quarter == 4 else date(year, quarter * 3 + 1, 1)
+    rows = db.execute(
+        select(Grant, Researcher.name)
+        .outerjoin(Researcher, Researcher.id == Grant.researcher_id)
+        .where(Grant.award_date >= start, Grant.award_date < end)
+        .order_by(Grant.award_date, Grant.id)
+    ).all()
+    return [
+        {"id": g.id, "title": g.title, "funder": g.funder, "amount": g.amount, "award_date": g.award_date,
+         "researcher_id": g.researcher_id, "researcher_name": name}
+        for g, name in rows
+    ]
 
 
 def is_grant(resource: dict) -> bool:

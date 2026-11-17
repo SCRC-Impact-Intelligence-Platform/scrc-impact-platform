@@ -33,6 +33,20 @@ export type QuarterlyReport = {
   /** The quarter's publications that have resource attributions, in the same order. */
   attributed_publications: AttributedPublication[]
   attribution_summary: AttributionSummary
+  /** Grants with an award date in the quarter; not affected by the resource filter. */
+  grants_received: ReportGrant[]
+}
+
+export type ReportGrant = {
+  id: number
+  title: string
+  funder: string
+  /** US dollars, as a decimal string. */
+  amount: string | null
+  /** ISO date, e.g. "2026-10-01". */
+  award_date: string
+  researcher_id: number | null
+  researcher_name: string | null
 }
 
 export type ReportingPeriod = { year: number; quarter: number }
