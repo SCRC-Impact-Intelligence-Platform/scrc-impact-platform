@@ -29,6 +29,7 @@ def save_publications(
             authors=data["authors"],
             journal=data.get("journal"),
             publication_date=data.get("publication_date"),
+            **{part: data.get(part) for part in ("publication_year", "publication_month", "publication_day")},
             doi=data.get("doi"),
             abstract=data.get("abstract"),
             first_discovered_by_orcid=source_orcid,

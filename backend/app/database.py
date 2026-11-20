@@ -1,18 +1,16 @@
 # app/database.py
 
-from pathlib import Path
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DB_PATH = Path(__file__).resolve().parent.parent / "local.db"
+# SQL Server connection URL, e.g.
+# mssql+pyodbc://user:password@host:1433/scrc_impact?driver=ODBC+Driver+18+for+SQL+Server
+DATABASE_URL = os.environ["DATABASE_URL"]
 
-DATABASE_URL = f"sqlite:///{DB_PATH}"
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
+# pool_pre_ping replaces connections the server has dropped.
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(bind=engine)
 

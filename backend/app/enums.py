@@ -34,3 +34,11 @@ class ResourceType(StrEnum):
 class PublicationConfidence(StrEnum):
     HIGH = "HIGH"
     LOW = "LOW"
+
+
+class ReportType(StrEnum):
+    """Audience of a report export; sets the PDF title."""
+    LEADERSHIP = "LEADERSHIP"
+    NIH = "NIH"
+    CIRM = "CIRM"
+    ADVANCEMENT = "ADVANCEMENT"

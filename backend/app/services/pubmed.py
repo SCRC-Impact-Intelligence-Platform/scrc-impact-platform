@@ -7,6 +7,8 @@ import xml.etree.ElementTree as ET
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from app.services.pubdates import date_parts, structured_date_parts
+
 BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 PAGE_SIZE = 100
 FETCH_BATCH_SIZE = 100
@@ -135,14 +137,15 @@ def _parse_article(article: ET.Element) -> dict | None:
             sections.append(f"{label}: {body}" if label else body)
     abstract = "\n\n".join(sections) or None
     pubdate = content.find("./Journal/JournalIssue/PubDate")
-    date_value = " ".join(x for x in (
-        pubdate.findtext("Year") if pubdate is not None else None,
-        pubdate.findtext("Month") if pubdate is not None else None,
-        pubdate.findtext("Day") if pubdate is not None else None,
-    ) if x) or (pubdate.findtext("MedlineDate") if pubdate is not None else None)
+    year, month, day, medline_date = (
+        pubdate.findtext(tag) if pubdate is not None else None for tag in ("Year", "Month", "Day", "MedlineDate")
+    )
+    date_value = " ".join(x for x in (year, month, day) if x) or medline_date
+    structured = structured_date_parts(year, month, day)
     journal = content.findtext("./Journal/Title")
     return {"pmid": pmid, "title": title, "authors": authors, "journal": journal,
-            "publication_date": date_value, "doi": doi, "abstract": abstract}
+            "publication_date": date_value, "doi": doi, "abstract": abstract,
+            **(structured or date_parts(date_value))}
 
 
 def fetch_publications(pmids: list[str]) -> list[dict]:

@@ -33,6 +33,9 @@ export type PublicationFilters = {
   offset: number
 }
 
+export const pubmedUrl = (pmid: string) =>
+  `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/`
+
 export const publicationsApi = {
   list: ({ status, confidence, researcher_id, limit, offset }: PublicationFilters) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })

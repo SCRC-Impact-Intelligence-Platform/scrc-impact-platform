@@ -11,6 +11,10 @@ dependencies = [
     "fastapi>=0.115,<1",
     "uvicorn>=0.30,<1",
     "sqlalchemy>=2.0,<3",
+    "pyodbc>=5.1,<6",
+    "citeproc-py>=0.6,<1",
+    "XlsxWriter>=3.2,<4",
+    "weasyprint>=62",
     "google-api-python-client>=2,<3",
     "google-auth-oauthlib>=1,<2",
     "email-validator>=2,<3",
@@ -20,6 +24,9 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["data/csl/*.csl"]
 
 [project.optional-dependencies]
 dev = [

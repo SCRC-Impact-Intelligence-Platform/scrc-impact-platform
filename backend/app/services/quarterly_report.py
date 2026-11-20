@@ -1,0 +1,137 @@
+"""Assembles the data behind the quarterly report and its exports."""
+
+from datetime import date
+
+from sqlalchemy import Select, case, func, select
+from sqlalchemy.orm import Session
+
+from app.enums import PublicationStatus, ResourceType
+from app.models.grant import Grant
+from app.models.publication import Publication
+from app.models.publication_resource import PublicationResource
+from app.models.researcher import Researcher
+from app.models.resource import Resource
+
+
+def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resource | None = None) -> dict:
+    """Verified (CONFIRMED) publications whose PubMed date falls in a calendar quarter.
+
+    Uses the stored date parts (a date range counts in the quarter it starts in).
+    Publications from ``year`` with no month ("2026", "2026 Spring") can't be
+    placed in a quarter; they are returned separately as ``undated_publications``.
+    Publications with no readable year at all belong to no year, so they are
+    returned as ``no_date_publications`` on every report.
+
+    With a ``resource``, every publication list and count only covers publications
+    attributed to it. ``grants_received`` (awarded in the quarter) is never filtered.
+    """
+    P = Publication
+    confirmed = select(P).where(P.status == PublicationStatus.CONFIRMED)
+    if resource is not None:
+        confirmed = confirmed.where(P.id.in_(_attributed_to(resource)))
+    confirmed_in_year = confirmed.where(P.publication_year == year)
+    first_month = (quarter - 1) * 3 + 1
+    in_quarter = confirmed_in_year.where(P.publication_month.between(first_month, first_month + 2))
+    publications = db.scalars(
+        in_quarter
+        # Missing day sorts first within its month; CASE is portable (no NULLS FIRST on SQL Server).
+        .order_by(P.publication_month, case((P.publication_day.is_(None), 0), else_=1), P.publication_day, P.id)
+    ).all()
+    undated = db.scalars(confirmed_in_year.where(P.publication_month.is_(None)).order_by(P.id)).all()
+    no_date = db.scalars(confirmed.where(P.publication_year.is_(None)).order_by(P.id)).all()
+    # A subquery, not a literal id list: SQL Server allows at most 2100 bound parameters.
+    resources = _attributions(db, in_quarter.with_only_columns(P.id))
+    attributed = [p for p in publications if p.id in resources]
+    attributed_total, grant_attributed_total = _attributed_counts(db, resource)
+    return {
+        "year": year,
+        "quarter": quarter,
+        "resource_id": resource.id if resource else None,
+        "resource_name": resource.name if resource else None,
+        "publications": publications,
+        "undated_publications": undated,
+        "no_date_publications": no_date,
+        "attributed_publications": [
+            {"publication": p, "resources": resources[p.id]} for p in attributed
+        ],
+        "grants_received": _grants_received(db, year, quarter),
+        "attribution_summary": {
+            "attributed_in_period": len(attributed),
+            "grant_attributed_in_period": sum(1 for p in attributed if any(map(is_grant, resources[p.id]))),
+            "attributed_total": attributed_total,
+            "grant_attributed_total": grant_attributed_total,
+        },
+    }
+
+
+def _grants_received(db: Session, year: int, quarter: int) -> list[dict]:
+    """Grants with an award date in the quarter, oldest first, with the researcher's name."""
+    start = date(year, (quarter - 1) * 3 + 1, 1)
+    end = date(year + 1, 1, 1) if quarter == 4 else date(year, quarter * 3 + 1, 1)
+    rows = db.execute(
+        select(Grant, Researcher.name)
+        .outerjoin(Researcher, Researcher.id == Grant.researcher_id)
+        .where(Grant.award_date >= start, Grant.award_date < end)
+        .order_by(Grant.award_date, Grant.id)
+    ).all()
+    return [
+        {"id": g.id, "title": g.title, "funder": g.funder, "amount": g.amount, "award_date": g.award_date,
+         "researcher_id": g.researcher_id, "researcher_name": name}
+        for g, name in rows
+    ]
+
+
+def is_grant(resource: dict) -> bool:
+    """Whether an attributed resource (as returned in ``attributed_publications``) is a grant."""
+    return resource["resource_type"] == ResourceType.FUNDING
+
+
+def _attributions(db: Session, publication_ids: Select) -> dict[int, list[dict]]:
+    """The resources attributed to each publication in the id subquery (unattributed ones absent)."""
+    rows = db.execute(
+        select(PublicationResource.publication_id, Resource.id, Resource.name, Resource.type,
+               PublicationResource.criticality)
+        .join(Resource, Resource.id == PublicationResource.resource_id)
+        .where(PublicationResource.publication_id.in_(publication_ids))
+        .order_by(Resource.name, Resource.id)
+    ).all()
+    result: dict[int, list[dict]] = {}
+    for publication_id, resource_id, name, resource_type, criticality in rows:
+        result.setdefault(publication_id, []).append({
+            "resource_id": resource_id, "resource_name": name,
+            "resource_type": resource_type, "criticality": criticality,
+        })
+    return result
+
+
+def _attributed_to(resource: Resource) -> Select:
+    return select(PublicationResource.publication_id).where(PublicationResource.resource_id == resource.id)
+
+
+def _attributed_counts(db: Session, resource: Resource | None = None) -> tuple[int, int]:
+    """All-time CONFIRMED publications attributed to any resource, and to a grant (FUNDING).
+
+    With a ``resource``, only publications attributed to that resource are counted.
+    """
+    publication_id = PublicationResource.publication_id
+    query = (
+        select(
+            func.count(func.distinct(publication_id)),
+            func.count(func.distinct(case((Resource.type == ResourceType.FUNDING.value, publication_id)))),
+        )
+        .select_from(PublicationResource)
+        .join(Resource, Resource.id == PublicationResource.resource_id)
+        .join(Publication, Publication.id == publication_id)
+        .where(Publication.status == PublicationStatus.CONFIRMED)
+    )
+    if resource is not None:
+        query = query.where(Publication.id.in_(_attributed_to(resource)))
+    total, grants = db.execute(query).one()
+    return total, grants
+
+
+def researcher_names(db: Session, publications: list[Publication]) -> dict[int, str]:
+    ids = {p.first_discovered_researcher_id for p in publications} - {None}
+    if not ids:
+        return {}
+    return dict(db.execute(select(Researcher.id, Researcher.name).where(Researcher.id.in_(ids))).all())

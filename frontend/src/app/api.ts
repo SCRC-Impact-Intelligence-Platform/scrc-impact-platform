@@ -1,5 +1,5 @@
 /** Browser requests stay same-origin; Vite/Nginx proxy /api to FastAPI. */
-const BASE = '/api'
+export const BASE = '/api'
 
 export class ApiError extends Error {
   constructor(
