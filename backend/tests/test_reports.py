@@ -1,4 +1,4 @@
-"""Quarterly report: CONFIRMED publications whose stored date falls in the quarter."""
+"""Reports: CONFIRMED publications whose stored date falls in a range of months."""
 
 import re
 import unittest
@@ -17,6 +17,7 @@ from app.models.publication import Publication
 from app.models.publication_resource import PublicationResource
 from app.models.resource import Resource
 from app.services.citations import format_citations
+from app.services.periods import MonthRange
 from app.services.pubdates import date_parts, parse_date
 
 
@@ -118,13 +119,17 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
         self.engine.dispose()
 
     def report(self, year, quarter):
-        response = self.client.get(f"/reports/quarterly?year={year}&quarter={quarter}")
+        first = (quarter - 1) * 3 + 1
+        return self.range(f"{year}-{first:02d}", f"{year}-{first + 2:02d}")
+
+    def range(self, start, end):
+        response = self.client.get(f"/reports?start={start}&end={end}")
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
     def test_lists_confirmed_in_quarter_in_date_order(self):
         body = self.report(2026, 1)
-        self.assertEqual((body["year"], body["quarter"]), (2026, 1))
+        self.assertEqual((body["start"], body["end"], body["period_label"]), ("2026-01", "2026-03", "Jan – Mar 2026"))
         # Missing day first, then by day ("Feb 3" before "Feb 12", not text order).
         self.assertEqual([p["pmid"] for p in body["publications"]], ["2", "1", "8", "9"])
         self.assertEqual([p["pmid"] for p in body["undated_publications"]], ["6"])
@@ -154,7 +159,7 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
         self.assertEqual(body["attribution_summary"]["attributed_total"], 4)
 
     def test_resource_filter(self):
-        body = self.client.get("/reports/quarterly?year=2026&quarter=1&resource_id=2").json()
+        body = self.client.get("/reports?start=2026-01&end=2026-03&resource_id=2").json()
         self.assertEqual((body["resource_id"], body["resource_name"]), (2, "CIRM Grant"))
         self.assertEqual([p["pmid"] for p in body["publications"]], ["1"])
         self.assertEqual([p["pmid"] for p in body["undated_publications"]], ["6"])
@@ -165,24 +170,52 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
             "attributed_in_period": 1, "grant_attributed_in_period": 1,
             "attributed_total": 3, "grant_attributed_total": 3,  # "1", "4", "6"; PENDING "3" excluded
         })
-        equipment = self.client.get("/reports/quarterly?year=2026&quarter=1&resource_id=1").json()
+        equipment = self.client.get("/reports?start=2026-01&end=2026-03&resource_id=1").json()
         self.assertEqual([p["pmid"] for p in equipment["publications"]], ["1", "9"])
         # "1" is also attributed to the grant, so it counts as grant-attributed.
         self.assertEqual(equipment["attribution_summary"]["grant_attributed_total"], 1)
 
     def test_unknown_resource_404(self):
-        self.assertEqual(self.client.get("/reports/quarterly?year=2026&quarter=1&resource_id=999").status_code, 404)
+        self.assertEqual(self.client.get("/reports?start=2026-01&end=2026-03&resource_id=999").status_code, 404)
         self.assertEqual(
-            self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=pdf&resource_id=999").status_code, 404
+            self.client.get("/reports/export?start=2026-01&end=2026-03&format=pdf&resource_id=999").status_code, 404
         )
 
     def test_report_type(self):
-        for report_type in ("LEADERSHIP", "NIH", "CIRM", "ADVANCEMENT"):
-            url = f"/reports/quarterly/export?year=2026&quarter=1&format=pdf&report_type={report_type}&resource_id=1"
+        for report_type in ("ATTRIBUTED", "VERIFIED", "BOTH"):
+            url = f"/reports/export?start=2026-01&end=2026-03&format=pdf&report_type={report_type}&resource_id=1"
             self.assertEqual(self.client.get(url).status_code, 200, report_type)
         self.assertEqual(
-            self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=pdf&report_type=OTHER").status_code, 422
+            self.client.get("/reports/export?start=2026-01&end=2026-03&format=pdf&report_type=OTHER").status_code, 422
         )
+
+    def test_calendar_year_includes_year_only_dates(self):
+        body = self.range("2026-01", "2026-12")
+        self.assertEqual(body["period_label"], "Jan – Dec 2026")
+        # Year-only "2026" (pmid 6) is in the year, sorted after the dated ones.
+        self.assertEqual([p["pmid"] for p in body["publications"]], ["2", "1", "8", "9", "4", "6"])
+        self.assertEqual(body["undated_publications"], [])
+        self.assertEqual(body["attribution_summary"]["attributed_in_period"], 4)  # 1, 9, 4, 6
+        self.assertEqual(body["attribution_summary"]["grant_attributed_in_period"], 3)  # 1, 4, 6
+        self.assertEqual([p["pmid"] for p in self.range("2025-01", "2025-12")["publications"]], ["5", "10", "7"])
+
+    def test_fiscal_year_spans_two_calendar_years(self):
+        body = self.range("2025-07", "2026-06")
+        self.assertEqual(body["period_label"], "Jul 2025 – Jun 2026")
+        self.assertEqual([p["pmid"] for p in body["publications"]], ["10", "2", "1", "8", "9", "4"])
+        # Neither 2025 nor 2026 is fully covered, so year-only dates can't be placed.
+        self.assertEqual([p["pmid"] for p in body["undated_publications"]], ["6", "7"])
+
+    def test_custom_month_range(self):
+        body = self.range("2025-12", "2026-02")
+        self.assertEqual(body["period_label"], "Dec 2025 – Feb 2026")
+        self.assertEqual([p["pmid"] for p in body["publications"]], ["10", "2", "1", "8"])
+        self.assertEqual([p["pmid"] for p in self.range("2026-02", "2026-02")["publications"]], ["1", "8"])
+
+    def test_export_file_name(self):
+        response = self.client.get("/reports/export?start=2025-07&end=2026-06&format=pdf")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('filename="publications-2025-07_to_2026-06.pdf"', response.headers["content-disposition"])
 
     def test_range_counts_in_starting_quarter(self):
         self.assertEqual([p["pmid"] for p in self.report(2025, 4)["publications"]], ["10"])
@@ -193,9 +226,9 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
             hostile.title = "=HYPERLINK(1)"
             db.add(hostile)
             db.commit()
-        response = self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=xlsx")
+        response = self.client.get("/reports/export?start=2026-01&end=2026-03&format=xlsx")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("verified-publications-2026-Q1.xlsx", response.headers["content-disposition"])
+        self.assertIn("publications-2026-01_to_2026-03.xlsx", response.headers["content-disposition"])
         with zipfile.ZipFile(BytesIO(response.content)) as workbook:
             strings = workbook.read("xl/sharedStrings.xml").decode()
             sheets = [workbook.read(name).decode() for name in workbook.namelist()
@@ -203,7 +236,7 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
             workbook_xml = workbook.read("xl/workbook.xml").decode()
         # Data only: the publication list stays the first sheet; summary counts are in the PDF.
         names = re.findall(r'<sheet name="([^"]+)"', workbook_xml)
-        self.assertEqual(names, ["Publications", "Attributed publications", "Not in a quarter"])
+        self.assertEqual(names, ["Publications", "Attributed publications", "Not in period"])
         self.assertIn("=HYPERLINK(1)", strings)
         self.assertIn("Flow Cytometer (Critical)", strings)
         for sheet in sheets:
@@ -215,19 +248,43 @@ class QuarterlyReportEndpointTests(unittest.TestCase):
             risky.title = "<img src='http://example.invalid/x'> & co"
             db.add(risky)
             db.commit()
-        response = self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=pdf")
+        response = self.client.get("/reports/export?start=2026-01&end=2026-03&format=pdf")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content.startswith(b"%PDF"))
 
     def test_export_with_no_results(self):
         for fmt in ("xlsx", "pdf"):
-            self.assertEqual(self.client.get(f"/reports/quarterly/export?year=1999&quarter=1&format={fmt}").status_code, 200)
+            self.assertEqual(self.client.get(f"/reports/export?start=1999-01&end=1999-03&format={fmt}").status_code, 200)
 
     def test_invalid_export_format_rejected(self):
-        self.assertEqual(self.client.get("/reports/quarterly/export?year=2026&quarter=1&format=doc").status_code, 422)
+        self.assertEqual(self.client.get("/reports/export?start=2026-01&end=2026-03&format=doc").status_code, 422)
 
-    def test_invalid_quarter_rejected(self):
-        self.assertEqual(self.client.get("/reports/quarterly?year=2026&quarter=5").status_code, 422)
+    def test_invalid_period_rejected(self):
+        for query in ("start=2026-13&end=2026-12", "start=2026-1&end=2026-03", "start=2026-04&end=2026-03", "start=2026-01"):
+            with self.subTest(query=query):
+                self.assertEqual(self.client.get(f"/reports?{query}").status_code, 422)
+
+
+class MonthRangeTests(unittest.TestCase):
+    def test_labels_and_slugs(self):
+        cases = {
+            ("2026-03", "2026-03"): ("Mar 2026", "2026-03_to_2026-03"),
+            ("2026-04", "2026-06"): ("Apr – Jun 2026", "2026-04_to_2026-06"),
+            ("2026-07", "2027-06"): ("Jul 2026 – Jun 2027", "2026-07_to_2027-06"),
+        }
+        for (start, end), (label, slug) in cases.items():
+            with self.subTest(start=start, end=end):
+                period = MonthRange.parse(start, end)
+                self.assertEqual((period.label(), period.slug()), (label, slug))
+
+    def test_full_years(self):
+        self.assertEqual(MonthRange.parse("2024-01", "2026-06").full_years(), [2024, 2025])
+        self.assertEqual(MonthRange.parse("2024-02", "2026-12").full_years(), [2025, 2026])
+        self.assertEqual(MonthRange.parse("2025-07", "2026-06").full_years(), [])
+
+    def test_parse_rejects_end_before_start(self):
+        with self.assertRaises(ValueError):
+            MonthRange.parse("2026-04", "2026-03")
 
 
 class CitationTests(unittest.TestCase):

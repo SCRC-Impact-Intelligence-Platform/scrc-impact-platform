@@ -1,6 +1,6 @@
-"""Assembles the data behind the quarterly report and its exports."""
+"""Assembles the data behind a report and its exports."""
 
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.enums import PublicationStatus, ResourceType
@@ -8,15 +8,17 @@ from app.models.publication import Publication
 from app.models.publication_resource import PublicationResource
 from app.models.researcher import Researcher
 from app.models.resource import Resource
+from app.services.periods import MonthRange
 
 
-def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resource | None = None) -> dict:
-    """Verified (CONFIRMED) publications whose PubMed date falls in a calendar quarter.
+def report_data(db: Session, period: MonthRange, resource: Resource | None = None) -> dict:
+    """Verified (CONFIRMED) publications whose PubMed date falls in a range of months.
 
-    Uses the stored date parts (a date range counts in the quarter it starts in).
-    Publications from ``year`` with no month ("2026", "2026 Spring") can't be
-    placed in a quarter; they are returned separately as ``undated_publications``.
-    Publications with no readable year at all belong to no year, so they are
+    Uses the stored date parts (a date range counts in the month it starts in).
+    A publication dated only by year ("2026", "2026 Spring") is included when the
+    period covers that whole calendar year. When the period covers the year only in
+    part, it can't be placed, so it is returned in ``undated_publications``.
+    Publications with no readable year at all belong to no period, so they are
     returned as ``no_date_publications`` on every report.
 
     With a ``resource``, every list and count only covers publications attributed to it.
@@ -25,23 +27,36 @@ def quarterly_report_data(db: Session, year: int, quarter: int, resource: Resour
     confirmed = select(P).where(P.status == PublicationStatus.CONFIRMED)
     if resource is not None:
         confirmed = confirmed.where(P.id.in_(_attributed_to(resource)))
-    confirmed_in_year = confirmed.where(P.publication_year == year)
-    first_month = (quarter - 1) * 3 + 1
-    in_quarter = confirmed_in_year.where(P.publication_month.between(first_month, first_month + 2))
+    month_index = P.publication_year * 12 + P.publication_month - 1
+    full_years = period.full_years()
+    partial_years = sorted(set(period.touched_years()) - set(full_years))
+    in_period = confirmed.where(or_(
+        month_index.between(period.start_index, period.end_index),
+        and_(P.publication_month.is_(None), P.publication_year.in_(full_years)),
+    ))
     publications = db.scalars(
-        in_quarter
-        # Missing day sorts first within its month; CASE is portable (no NULLS FIRST on SQL Server).
-        .order_by(P.publication_month, case((P.publication_day.is_(None), 0), else_=1), P.publication_day, P.id)
+        in_period.order_by(
+            P.publication_year,
+            # Year-only dates last within their year, and a missing day first within its month.
+            # CASE is portable (no NULLS FIRST on SQL Server).
+            case((P.publication_month.is_(None), 13), else_=P.publication_month),
+            case((P.publication_day.is_(None), 0), else_=1),
+            P.publication_day,
+            P.id,
+        )
     ).all()
-    undated = db.scalars(confirmed_in_year.where(P.publication_month.is_(None)).order_by(P.id)).all()
+    undated = db.scalars(
+        confirmed.where(P.publication_month.is_(None), P.publication_year.in_(partial_years)).order_by(P.id)
+    ).all()
     no_date = db.scalars(confirmed.where(P.publication_year.is_(None)).order_by(P.id)).all()
     # A subquery, not a literal id list: SQL Server allows at most 2100 bound parameters.
-    resources = _attributions(db, in_quarter.with_only_columns(P.id))
+    resources = _attributions(db, in_period.with_only_columns(P.id))
     attributed = [p for p in publications if p.id in resources]
     attributed_total, grant_attributed_total = _attributed_counts(db, resource)
     return {
-        "year": year,
-        "quarter": quarter,
+        "start": period.start,
+        "end": period.end,
+        "period_label": period.label(),
         "resource_id": resource.id if resource else None,
         "resource_name": resource.name if resource else None,
         "publications": publications,

@@ -37,8 +37,7 @@ class PublicationConfidence(StrEnum):
 
 
 class ReportType(StrEnum):
-    """Audience of a report export; sets the PDF title."""
-    LEADERSHIP = "LEADERSHIP"
-    NIH = "NIH"
-    CIRM = "CIRM"
-    ADVANCEMENT = "ADVANCEMENT"
+    """Which publication lists a report export contains."""
+    ATTRIBUTED = "ATTRIBUTED"
+    VERIFIED = "VERIFIED"
+    BOTH = "BOTH"

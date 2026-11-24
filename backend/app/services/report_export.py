@@ -1,4 +1,4 @@
-"""Excel and PDF versions of the quarterly report."""
+"""Excel and PDF versions of a report."""
 
 from html import escape
 from io import BytesIO
@@ -8,7 +8,7 @@ import xlsxwriter
 from app.enums import ReportType
 from app.models.publication import Publication
 from app.services.citations import format_citations
-from app.services.quarterly_report import is_grant
+from app.services.report_data import is_grant
 
 _COLUMNS = (("#", 5), ("Title", 60), ("Authors", 40), ("Journal", 30), ("Date", 14),
             ("Researcher", 24), ("PMID", 12), ("DOI", 28), ("Citation", 80))
@@ -26,14 +26,9 @@ def _write_header(sheet, columns, bold, wrap) -> None:
         sheet.set_column(column, column, width, wrap)
 
 
-def period_label(year: int, quarter: int) -> str:
-    months = ("Jan - Mar", "Apr - Jun", "Jul - Sep", "Oct - Dec")[quarter - 1]
-    return f"Q{quarter} {year} ({months})"
-
-
 def _excluded(report: dict) -> list[tuple[str, list[Publication]]]:
     return [
-        (f"From {report['year']} with no month in the PubMed date", report["undated_publications"]),
+        ("Dated only by a year this period covers in part", report["undated_publications"]),
         ("No readable publication date", report["no_date_publications"]),
     ]
 
@@ -41,9 +36,9 @@ def _excluded(report: dict) -> list[tuple[str, list[Publication]]]:
 def summary_rows(report: dict) -> list[tuple[str, int]]:
     s = report["attribution_summary"]
     return [
-        ("Verified publications this quarter", len(report["publications"])),
-        ("Attributed publications this quarter", s["attributed_in_period"]),
-        ("Attributed to grants this quarter", s["grant_attributed_in_period"]),
+        ("Verified publications this period", len(report["publications"])),
+        ("Attributed publications this period", s["attributed_in_period"]),
+        ("Attributed to grants this period", s["grant_attributed_in_period"]),
         ("Attributed publications, all time", s["attributed_total"]),
         ("Attributed to grants, all time", s["grant_attributed_total"]),
     ]
@@ -80,7 +75,7 @@ def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
                       "; ".join(r["resource_name"] for r in resources if is_grant(r)), citations[p.pmid])
             for column, value in enumerate(values, start=1):
                 attributed.write_string(row, column, value)
-        excluded = workbook.add_worksheet("Not in a quarter")
+        excluded = workbook.add_worksheet("Not in period")
         _write_header(excluded, _EXCLUDED_COLUMNS, bold, wrap)
         row = 1
         for reason, publications in _excluded(report):
@@ -92,18 +87,17 @@ def build_xlsx(report: dict, researcher_names: dict[int, str]) -> bytes:
 
 
 REPORT_TITLES = {
-    ReportType.LEADERSHIP: "Leadership report",
-    ReportType.NIH: "NIH report",
-    ReportType.CIRM: "CIRM report",
-    ReportType.ADVANCEMENT: "Advancement report",
+    ReportType.ATTRIBUTED: "Attributed publications report",
+    ReportType.VERIFIED: "Verified publications report",
+    ReportType.BOTH: "Publications report",
 }
 
 
-def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> bytes:
+def build_pdf(report: dict, report_type: ReportType = ReportType.BOTH) -> bytes:
     # Imported here because WeasyPrint needs the Pango system libraries at import time.
     from weasyprint import HTML
 
-    label = escape(period_label(report["year"], report["quarter"]))
+    label = escape(report["period_label"])
     if report["resource_name"]:
         label += f" &middot; Resource: {escape(report['resource_name'])}"
     title = escape(REPORT_TITLES[report_type])
@@ -114,8 +108,10 @@ def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> 
         for reason, publications in _excluded(report) if publications
     )
     count = len(report["publications"])
+    # Attribution counts, plus the verified count when both lists are in the report.
+    rows = summary_rows(report)[(0 if report_type == ReportType.BOTH else 1):]
     summary = "".join(f"<tr><td>{escape(label)}</td><td class='n'>{value}</td></tr>"
-                      for label, value in summary_rows(report))
+                      for label, value in rows)
     attributed_items = "".join(
         f"<li>{escape(citations[item['publication'].pmid])}"
         f"<div class='res'>Resources: {escape('; '.join(map(resource_label, item['resources'])))}</div></li>"
@@ -123,6 +119,11 @@ def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> 
     )
     attributed = (f"<ol>{attributed_items}</ol>" if attributed_items
                   else "<p class='note'>No attributed publications in this period.</p>")
+    sections = ""
+    if report_type != ReportType.VERIFIED:
+        sections += f"<h2>Summary</h2><table>{summary}</table><h2>Attributed publications</h2>{attributed}"
+    if report_type != ReportType.ATTRIBUTED:
+        sections += f"<h2>Verified publications</h2><p class='sub'>{count} publication(s)</p>{notes}<ol>{items}</ol>"
     html = f"""<!doctype html><meta charset="utf-8"><style>
       @page {{ size: letter; margin: 0.75in; }}
       body {{ font-family: sans-serif; font-size: 10.5pt; line-height: 1.4; }}
@@ -136,8 +137,5 @@ def build_pdf(report: dict, report_type: ReportType = ReportType.LEADERSHIP) -> 
       .res {{ color: #444; font-size: 9.5pt; margin-top: 2pt; }}
     </style>
     <h1>{title}</h1><p class="sub">{label}</p>
-    <h2>Summary</h2><table>{summary}</table>
-    <h2>Attributed publications</h2>{attributed}
-    <h2>Verified publications</h2><p class="sub">{count} publication(s)</p>
-    {notes}<ol>{items}</ol>"""
+    {sections}"""
     return HTML(string=html).write_pdf()
