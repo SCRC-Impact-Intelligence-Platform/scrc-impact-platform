@@ -1,16 +1,19 @@
 # app/database.py
 
 import os
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# SQL Server connection URL, e.g.
-# mssql+pyodbc://user:password@host:1433/scrc_impact?driver=ODBC+Driver+18+for+SQL+Server
-DATABASE_URL = os.environ["DATABASE_URL"]
+# SQLite file next to the backend package unless DATABASE_URL overrides it
+# (tests use DATABASE_URL=sqlite:// for an in-memory database).
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "local.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
-# pool_pre_ping replaces connections the server has dropped.
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# FastAPI runs sync endpoints in a thread pool, so SQLite connections cross threads.
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(bind=engine)
 
